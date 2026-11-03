@@ -1,0 +1,38 @@
+{
+  "name": "kepAdm",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server/main.js -w src/server",
+    "start": "cross-env NODE_ENV=production node src/server/main.js",
+    "build": "vite build",
+    "db:check": "node --env-file=.env scripts/db-check.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.10.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cross-env": "^7.0.3",
+    "dotenv": "^18.0.9",
+    "express": "^5.1.0",
+    "lucide-react": "^0.460.0",
+    "mssql": "^12.7.13",
+    "nodemailer": "^10.3.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.91.0",
+    "react-router-dom": "^7.18.5",
+    "vite-express": "*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "nodemon": "^3.1.10",
+    "tailwindcss": "^4.3.3",
+    "vite": "^6.3.3"
+  }
+}
