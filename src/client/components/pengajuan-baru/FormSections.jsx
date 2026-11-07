@@ -146,11 +146,13 @@ function FileField({ label, name, value, recordId, onUpload, uploading, readOnly
           )}
         </div>
         <p id={`${inputId}-hint`} className="mt-2 text-[12px] text-ink-faint">
-          {uploading
-            ? "Mengunggah…"
-            : value
-              ? "Seret file baru untuk mengganti."
-              : "PDF, JPG, atau PNG · maks 10 MB. Bisa juga seret file ke sini."}
+          {readOnly
+            ? "Tidak dapat diubah setelah dikirim."
+            : uploading
+              ? "Mengunggah…"
+              : value
+                ? "Seret file baru untuk mengganti."
+                : "PDF, JPG, atau PNG · maks 10 MB. Bisa juga seret file ke sini."}
         </p>
       </div>
     </div>

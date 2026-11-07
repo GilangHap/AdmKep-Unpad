@@ -95,7 +95,10 @@ function Editor({ id, value, onChange, onBlur, describedBy, invalid, readOnly })
   }, [value]);
 
   useEffect(() => {
-    quill.current?.enable(!readOnly);
+    const q = quill.current;
+    q?.enable(!readOnly);
+    const bar = q?.getModule("toolbar")?.container;
+    if (bar) bar.style.display = readOnly ? "none" : "";
   }, [readOnly]);
 
   return (
