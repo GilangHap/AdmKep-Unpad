@@ -48,7 +48,7 @@ export async function sendActivationEmail({ to, name, token, expiresAt }) {
       `Tautan berlaku ${hours} jam dan hanya dapat dipakai sekali.`,
       "Jika Anda tidak merasa mendaftar, abaikan email ini.",
       "",
-      "â€” Komite Etik Penelitian Universitas Padjadjaran",
+      "- Komite Etik Penelitian Universitas Padjadjaran",
     ].join("\n"),
     html: activationHtml({ name, url, hours }),
   });
@@ -70,7 +70,7 @@ export async function sendPasswordResetEmail({ to, name, password }) {
       "Masuk lalu segera ganti kata sandi ini. Jika Anda tidak meminta perubahan,",
       "hubungi kep@unpad.ac.id.",
       "",
-      "â€” Komite Etik Penelitian Universitas Padjadjaran",
+      "- Komite Etik Penelitian Universitas Padjadjaran",
     ].join("\n"),
     html: resetHtml({ name, password }),
   });

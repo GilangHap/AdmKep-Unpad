@@ -2,7 +2,7 @@
 
 // SQL Server connection for the legacy komitik_backup database.
 // Uses SQL login (DB_USER/DB_PASSWORD). Set DB_INSTANCE for a named instance
-// (e.g. SQLEXPRESS) â€” it then overrides DB_PORT.
+// (e.g. SQLEXPRESS) - it then overrides DB_PORT.
 const config = {
   server: process.env.DB_HOST || "localhost",
   port: Number(process.env.DB_PORT || 1433),

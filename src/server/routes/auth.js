@@ -93,7 +93,7 @@ const changePasswordBody = z
 const digits = (value) => String(value ?? "").replace(/\D/g, "");
 const looseText = (value) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 
-/** One message for every register outcome â€” never reveals whether the email exists. */
+/** One message for every register outcome - never reveals whether the email exists. */
 const GENERIC_SENT =
   "Jika email tersebut belum terdaftar, kami sudah mengirim tautan aktivasi. Periksa kotak masuk Anda.";
 
@@ -121,7 +121,7 @@ async function issueActivation(account) {
   return expiresAt;
 }
 
-// POST /api/auth/login  â€” verifies against dbo.t_user (legacy bcrypt hashes included).
+// POST /api/auth/login  - verifies against dbo.t_user (legacy bcrypt hashes included).
 router.post("/login", async (req, res) => {
   const parsed = loginBody.safeParse(req.body);
   if (!parsed.success) {
@@ -279,7 +279,7 @@ router.post("/register", async (req, res) => {
     // Do not confirm the account exists; point the person at the login page instead.
     return res.status(409).json({
       error:
-        "Email ini sudah terdaftar. Silakan masuk, atau gunakan â€œLupa kata sandiâ€ bila Anda tidak ingat kata sandinya.",
+        'Email ini sudah terdaftar. Silakan masuk, atau gunakan "Lupa kata sandi" bila Anda tidak ingat kata sandinya.',
     });
   }
 
@@ -314,7 +314,7 @@ router.post("/register", async (req, res) => {
 
   return res.status(201).json({
     message:
-      "Pendaftaran berhasil. Kami mengirim tautan aktivasi ke email Anda â€” periksa kotak masuk (dan folder spam).",
+      "Pendaftaran berhasil. Kami mengirim tautan aktivasi ke email Anda - periksa kotak masuk (dan folder spam).",
     email: account.email,
     status: account.status,
     expiresAt,
@@ -401,7 +401,7 @@ router.post("/activate", async (req, res) => {
   });
 });
 
-// GET /api/auth/activation-status?email=  â€” used by the "check your email" screen
+// GET /api/auth/activation-status?email=  - used by the "check your email" screen
 router.get("/activation-status", async (req, res) => {
   const parsed = emailBody.safeParse({ email: req.query.email ?? "" });
   if (!parsed.success) return res.status(400).json({ error: "Email tidak valid." });

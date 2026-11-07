@@ -139,7 +139,7 @@ export default function ActivatePage() {
       <AuthShell title="Mengaktifkan akun" subtitle="Mohon tunggu sebentar." footer={footer}>
         <div className="flex items-center gap-3 rounded-2xl bg-canvas p-4">
           <span className="size-5 animate-spin rounded-full border-2 border-brand border-t-transparent" aria-hidden="true" />
-          <p className="text-[15px] text-ink-soft">Memeriksa tautan aktivasiâ€¦</p>
+          <p className="text-[15px] text-ink-soft">Memeriksa tautan aktivasi...</p>
         </div>
       </AuthShell>
     );
