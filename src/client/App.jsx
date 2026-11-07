@@ -9,7 +9,8 @@ import DashboardPage from "@/pages/app/DashboardPage";
 import ModulePage from "@/pages/app/ModulePage";
 import PengajuanBaruListPage from "@/pages/app/PengajuanBaruListPage";
 import PengajuanBaruFormPage from "@/pages/app/PengajuanBaruFormPage";
-import { AuthProvider, RequireAuth } from "@/lib/AuthProvider";
+import SettingsPage from "@/pages/app/SettingsPage";
+import { AuthProvider, GuestOnly, RequireAuth } from "@/lib/AuthProvider";
 
 const MODULES = [
   {
@@ -57,17 +58,20 @@ export default function App() {
       <AuthProvider>
       <Routes>
         <Route path="/" element={<Navigate to="/registrasi-akun" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/registrasi" element={<RegisterPage />} />
-        <Route path="/lupa-password" element={<ForgotPasswordPage />} />
-        <Route path="/cek-status" element={<StatusPage />} />
-        <Route path="/aktivasi/:token?" element={<ActivatePage />} />
-        <Route path="/registrasi-akun" element={<PortalPage />} />
+        <Route element={<GuestOnly />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/registrasi" element={<RegisterPage />} />
+          <Route path="/lupa-password" element={<ForgotPasswordPage />} />
+          <Route path="/cek-status" element={<StatusPage />} />
+          <Route path="/aktivasi/:token?" element={<ActivatePage />} />
+          <Route path="/registrasi-akun" element={<PortalPage />} />
+        </Route>
 
         <Route path="/app" element={<Navigate to="/app/dasbor" replace />} />
         <Route path="/app/dasbor" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/app/pengajuan-baru" element={<RequireAuth><PengajuanBaruListPage /></RequireAuth>} />
         <Route path="/app/pengajuan-baru/baru" element={<RequireAuth><PengajuanBaruFormPage /></RequireAuth>} />
+        <Route path="/app/pengajuan-baru/:id" element={<RequireAuth><PengajuanBaruFormPage /></RequireAuth>} />
         {MODULES.map((m) => (
           <Route
             key={m.path}
@@ -79,10 +83,7 @@ export default function App() {
           path="/app/pengaturan"
           element={
             <RequireAuth>
-              <ModulePage
-                title="Pengaturan akun"
-                description="Ubah kata sandi, email contact person, dan preferensi notifikasi."
-              />
+              <SettingsPage />
             </RequireAuth>
           }
         />

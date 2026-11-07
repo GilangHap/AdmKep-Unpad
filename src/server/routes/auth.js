@@ -6,22 +6,22 @@ import {
   findByEmail,
   createAccount,
   updateAccount,
+  updateProfile,
   activateAccount,
+  isReviewerEmail,
+  setPassword,
+  groupName,
+} from "../lib/repositories/users.js";
+import {
   saveActivation,
   findActivation,
   useActivation,
   revokeActivationsFor,
   countActivationsSince,
   latestActivationFor,
-  isReviewerEmail,
-  saveResetRequest,
-  countResetsSince,
-  setPassword,
-  groupName,
-  createSession,
-  deleteSession,
-  deleteExpiredSessions,
-} from "../lib/store.js";
+} from "../lib/repositories/activations.js";
+import { saveResetRequest, countResetsSince } from "../lib/repositories/passwordResets.js";
+import { createSession, deleteSession, deleteExpiredSessions } from "../lib/repositories/sessions.js";
 import {
   SESSION_COOKIE,
   newSessionToken,
@@ -71,6 +71,24 @@ const resetBody = z.object({
   reason: z.string().trim().max(100).optional().default(""),
   group: z.enum(["PEMOHON", "REVIEWER"]),
 });
+
+const profileBody = z.object({
+  name: z.string().trim().min(1).max(50),
+  gender: z.enum(["L", "P"]),
+  phone: z.string().trim().min(1).max(20),
+  institution: z.string().trim().min(1).max(100),
+});
+
+const changePasswordBody = z
+  .object({
+    currentPassword: z.string().min(1).max(200),
+    password: z.string().min(8).max(30),
+    confirmPassword: z.string().min(1),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Konfirmasi kata sandi tidak sama",
+  });
 
 const digits = (value) => String(value ?? "").replace(/\D/g, "");
 const looseText = (value) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -148,6 +166,47 @@ router.post("/login", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   const roleName = await groupName(req.user.cGroup);
   return res.json({ user: publicUser(req.user, roleName) });
+});
+
+// PATCH /api/auth/profile — the signed-in account edits its own contact details.
+router.patch("/profile", requireAuth, async (req, res) => {
+  const parsed = profileBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "Periksa kembali data profil Anda.",
+      fields: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const account = req.user;
+  Object.assign(account, parsed.data);
+  await updateProfile(account);
+
+  const roleName = res.locals.roleName ?? (await groupName(account.cGroup));
+  return res.json({ user: publicUser(account, roleName) });
+});
+
+// POST /api/auth/change-password — requires the current password, never emails a new one.
+router.post("/change-password", requireAuth, async (req, res) => {
+  const parsed = changePasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "Periksa kembali kata sandi Anda.",
+      fields: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const { currentPassword, password } = parsed.data;
+  const valid = await bcrypt.compare(currentPassword, req.user.passwordHash);
+  if (!valid) {
+    return res.status(400).json({
+      error: "Kata sandi saat ini salah.",
+      fields: { currentPassword: ["Kata sandi saat ini salah"] },
+    });
+  }
+
+  await setPassword(req.user, await bcrypt.hash(password, BCRYPT_ROUNDS));
+  return res.json({ message: "Kata sandi berhasil diperbarui." });
 });
 
 // POST /api/auth/logout

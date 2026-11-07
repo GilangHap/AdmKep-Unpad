@@ -53,6 +53,39 @@ export const registerSchema = z
     message: "Konfirmasi kata sandi tidak sama",
   });
 
+export const profileSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Nama peneliti wajib diisi")
+    .max(50, "Nama maksimal 50 karakter"),
+  gender: z.enum(["L", "P"], {
+    errorMap: () => ({ message: "Jenis kelamin wajib dipilih" }),
+  }),
+  phone: z
+    .string()
+    .min(1, "Nomor kontak wajib diisi")
+    .regex(indonesianPhone, "Nomor kontak tidak valid (contoh: 08123456789)")
+    .max(20, "Nomor kontak maksimal 20 karakter"),
+  institution: z
+    .string()
+    .min(1, "Nama instansi wajib diisi")
+    .max(100, "Nama instansi maksimal 100 karakter"),
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Kata sandi saat ini wajib diisi"),
+    password: z
+      .string()
+      .min(8, "Kata sandi minimal 8 karakter")
+      .max(30, "Kata sandi maksimal 30 karakter"),
+    confirmPassword: z.string().min(1, "Konfirmasi kata sandi wajib diisi"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Konfirmasi kata sandi tidak sama",
+  });
+
 export const forgotPasswordSchema = z.object({
   email: z
     .string()

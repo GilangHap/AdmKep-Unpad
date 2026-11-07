@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import ViteExpress from "vite-express";
 import authRoutes from "./routes/auth.js";
 import statusRoutes from "./routes/status.js";
+import pengajuanBaruRoutes from "./routes/pengajuanBaru.js";
 import { getPool } from "./lib/db.js";
 import { attachUser } from "./lib/session.js";
 
@@ -16,6 +17,7 @@ app.use(attachUser);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/status", statusRoutes);
+app.use("/api/pengajuan-baru", pengajuanBaruRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {
@@ -37,6 +39,9 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({ error: "Format permintaan tidak valid." });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "File terlalu besar (maks 10 MB)." });
   }
   console.error(err);
   return res.status(500).json({ error: "Terjadi kesalahan pada server." });

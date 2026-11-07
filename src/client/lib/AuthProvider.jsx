@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { me, login as apiLogin, logout as apiLogout } from "@/lib/authApi";
 
 const AuthContext = createContext(null);
@@ -37,7 +37,12 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, status, login, logout }), [user, status, login, logout]);
+  const updateUser = useCallback((next) => setUser(next), []);
+
+  const value = useMemo(
+    () => ({ user, status, login, logout, updateUser }),
+    [user, status, login, logout, updateUser],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -46,6 +51,15 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth harus dipakai di dalam AuthProvider");
   return ctx;
+}
+
+/** Auth pages only for guests: a signed-in visitor goes straight to the dashboard. */
+export function GuestOnly() {
+  const { user, status } = useAuth();
+
+  if (status === "loading") return null;
+  if (user) return <Navigate to="/app/dasbor" replace />;
+  return <Outlet />;
 }
 
 /** Blocks the app area until the session is known; sends guests to the login page. */

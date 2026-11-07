@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { searchEthics } from "../lib/store.js";
+import { searchEthics } from "../lib/repositories/ethics.js";
 
 const router = Router();
 

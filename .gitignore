@@ -34,3 +34,10 @@ docs/superpowers
 .taste-skill
 scratch-*.mjs
 .login-flow.json
+
+# Uploaded attachments (legacy stores these outside the repo)
+var/uploads
+
+# Local screenshots / error dumps
+shots/
+*.err

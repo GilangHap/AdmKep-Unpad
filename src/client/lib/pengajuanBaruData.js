@@ -10,21 +10,95 @@ export const YA_TIDAK = [
 
 export const JENIS_SUBJEK = [
   { value: "", label: "-- Pilih --" },
-  { value: "1", label: "Subjek manusia" },
-  { value: "2", label: "Hewan" },
-  { value: "3", label: "Mikroorganisme / cell line / BBT" },
+  {
+    value: "1",
+    label:
+      "Manusia/data rekam medik/data registri/data publik/BBT/cell line/sisa spesimen biologis lainnya",
+  },
+  {
+    value: "2",
+    label:
+      "Hewan bertulang belakang (termasuk jaringan/bahan biologis/BBT/sisa spesimen biologis lainnya/uji pada hewan hidup)",
+  },
+  { value: "3", label: "Mikroorganisme/ hewan tak bertulang belakang / cell line komersial" },
 ];
 
 export const KELOMPOK = [
   { value: "", label: "-- Pilih kelompok --" },
-  { value: "1", label: "FL_2.2.3 Non klinis / survei / epidemiologi" },
-  { value: "2", label: "FL_2.2.2 Uji klinis" },
-  { value: "3", label: "FL_2.2.6 Penggunaan & kesejahteraan hewan" },
-  { value: "4", label: "FL_2.2.5 Sosial komunitas" },
-  { value: "5", label: "FL_2.2.4 BBT riset dasar" },
-  { value: "6", label: "FL_2.2.7 BBT hewan" },
-  { value: "7", label: "FL_2.2.8 Laporan kasus / serial kasus" },
+  { value: "1", label: "FL/2.2.3 Formulir Etik Penelitian Non Uji Klinis" },
+  { value: "2", label: "FL_2.2.2 Formulir Etik Penelitian Uji klinis" },
+  { value: "3", label: "FL_2.2.6 Formulir Etik Penelitian Penggunaan dan Kesejahteraan Hewan" },
+  { value: "4", label: "FL_2.2.5 Formulir Etik Penelitian Sosial Komunitas" },
+  { value: "5", label: "FL_2.2.4 Formulir Penelitian BBT Riset Dasar" },
+  { value: "6", label: "FL_2.2.7 Formulir Etik Penelitian Penggunaan BBT Hewan" },
+  { value: "7", label: "FL/2.2.10 Lembar Informasi Laporan Kasus" },
 ];
+
+// Daftar dokumen wajib per kelompok, disalin dari tampilan jenisformetik di legacy
+// (ref/pengajuanbaru/pengajuanbarudata.phtml). Kelompok 5 punya dua varian.
+// URL unduhan diambil dari https://kep.unpad.ac.id/layanan/persyaratan.
+const FORM = "https://admkep.unpad.ac.id/format_dokumen/2026/Formulir_Etik/";
+const FL_222 = FORM + "FL_2.2.2%20Formulir%20Etik%20Penelitian%20Uji%20klinis.docx";
+const FL_223 =
+  FORM +
+  "FL_2.2.3%20Formulir%20Etik%20Penelitian%20Survei_Registri_Epidemiologi-Humaniora%20Dan%20Non%20klinis%20lainnya%20(Riset%20dasar,%20Riset%20Kesehatan%20Komunitas).docx";
+const FL_224 = FORM + "FL_2.2.4%20Formulir%20Penelitian%20BBT%20Riset%20dasar.docx";
+const FL_225 = FORM + "FL_2.2.5%20Formulir%20Etik%20Penelitian%20Sosial%20Komunitas.docx";
+const FL_226 = FORM + "FL_2.2.6%20Formulir%20Etik%20Penelitian%20Penggunaan%20dan%20Kesejahteraan%20Hewan.docx";
+const FL_227 = FORM + "FL_2.2.7%20Formulir%20Etik%20Penelitian%20Penggunaan%20BBT%20hewan.docx";
+const FL_228 = FORM + "FL_2.2.8%20Formulir%20Etik%20Laporan%20Kasus_Serial%20Kasus%20Klinis.docx";
+const CRF = "https://admkep.unpad.ac.id/format_dokumen/Contoh%20Lampiran%20Case%20Report%20Form%20(CRF).docx";
+
+const HELSINKI = { label: "Lembar pernyataan Kepatuhan terhadap Deklarasi Helsinki" };
+const BIODATA = { label: "Biodata Peneliti Utama dan Pembimbing/Peneliti Lain" };
+const LEMBAR_INFORMASI = { label: "FL/2.2.9 Lembar Informasi" };
+
+export const DOKUMEN_KELOMPOK = {
+  1: [
+    {
+      label:
+        "FL/2.2.3 Formulir Etik Penelitian Survei/Registri/Epidemiologi-Humaniora Dan Non klinis lainnya (Riset dasar, Riset Kesehatan Komunitas)",
+      url: FL_223,
+    },
+    HELSINKI,
+    LEMBAR_INFORMASI,
+    BIODATA,
+  ],
+  2: [
+    { label: "FL_2.2.2 Formulir Etik Penelitian Uji klinis", url: FL_222 },
+    HELSINKI,
+    LEMBAR_INFORMASI,
+    BIODATA,
+    { label: "Sertifikat GCP" },
+    { label: "Lampiran Case Report Form (CRF)", url: CRF },
+  ],
+  3: [{ label: "FL_2.2.6 Formulir Etik Penelitian Penggunaan dan Kesejahteraan Hewan", url: FL_226 }, BIODATA],
+  4: [
+    { label: "FL_2.2.5 Formulir Etik Penelitian Sosial Komunitas", url: FL_225 },
+    HELSINKI,
+    LEMBAR_INFORMASI,
+    BIODATA,
+  ],
+  5: [{ label: "FL_2.2.4 Formulir Penelitian BBT Riset Dasar", url: FL_224 }, HELSINKI, BIODATA],
+  "5Y": [
+    { label: "FL_2.2.4 Formulir Penelitian BBT Riset Dasar", url: FL_224 },
+    HELSINKI,
+    { ...LEMBAR_INFORMASI, label: `${LEMBAR_INFORMASI.label} (bila akan melakukan pengambilan consent ulang)` },
+    BIODATA,
+  ],
+  6: [{ label: "FL_2.2.7 Formulir Etik Penelitian Penggunaan BBT Hewan", url: FL_227 }, BIODATA],
+  7: [
+    { label: "FL/2.2.8 Formulir Etik Laporan Kasus/Serial Kasus Klinis", url: FL_228 },
+    HELSINKI,
+    { label: "FL/2.2.10 Lembar Informasi Laporan Kasus" },
+    BIODATA,
+  ],
+};
+
+export function dokumenDariGate(v) {
+  if (v.c_jenis_subjek === "1" && v.fetik_p1 === "Y") return DOKUMEN_KELOMPOK["5Y"];
+  return null;
+}
 
 
 // taste-skill-ignore: kode jenjang adalah nilai DB legacy, bukan penomoran dekoratif.
@@ -131,7 +205,7 @@ export const EMPTY_PENGAJUAN = {
   c_peneliti_lain: "",
   pembimbing: [{ n_nama: "" }],
   n_judul: "",
-  ver_pro: "",
+  ver_pro: "00",
   bidang_ilmu: "",
   ringkasan_penelitian: "",
   tujuan_penelitian: "",
@@ -142,6 +216,9 @@ export const EMPTY_PENGAJUAN = {
   c_kerjasama: "",
   v_jum_negara: "",
   c_peneliti_asing_stat: "",
+  file_izin_asing: "",
+  file_mou: "",
+  file_mta: "",
   peneliti_asing: [{ n_nama_asing: "", n_tugas_asing: "", n_kontak_asing: "" }],
   n_tempat_penelitian: "",
   d_awal: "",
@@ -149,6 +226,7 @@ export const EMPTY_PENGAJUAN = {
   d_rekrutmen: "",
   c_etik_lain: "",
   c_status_etik_lain: "",
+  file_etik_lain: "",
   s_rincian_dana: "",
   c_coi: "",
   u_coi: "",

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
-import { findSession, findById, touchSession, deleteSession, groupName } from "./store.js";
+import { findSession, touchSession, deleteSession } from "./repositories/sessions.js";
+import { findById, groupName } from "./repositories/users.js";
 
 export const SESSION_COOKIE = "kepadm_sid";
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours

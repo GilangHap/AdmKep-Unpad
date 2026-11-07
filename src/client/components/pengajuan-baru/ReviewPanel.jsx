@@ -14,11 +14,13 @@ const LABELS = {
   d_rekrutmen: "Mulai rekrutmen",
 };
 
-export function ReviewPanel({ values, agreed, onAgree }) {
+export function ReviewPanel({ values, agreed, onAgree, readOnly = false }) {
   return (
     <div className="mt-6">
-      <Alert tone="info" title="Periksa kembali sebelum mengirim">
-        Pastikan data sudah benar. Setelah dikirim, perubahan harus melalui pengajuan perbaikan.
+      <Alert tone="info" title={readOnly ? "Ringkasan pengajuan" : "Periksa kembali sebelum mengirim"}>
+        {readOnly
+          ? "Pengajuan sudah dikirim dan menunggu verifikasi petugas."
+          : "Setelah dikirim, pengajuan masuk antrean verifikasi petugas dan tidak dapat diubah dari halaman ini."}
       </Alert>
 
       <dl className="mt-4 divide-y divide-line rounded-xl border border-line">
@@ -32,18 +34,20 @@ export function ReviewPanel({ values, agreed, onAgree }) {
         ))}
       </dl>
 
-      <label className="mt-4 flex items-start gap-2.5 text-[13.5px] text-ink-soft">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => onAgree(e.target.checked)}
-          className="mt-0.5 size-4 accent-[#003d7a]"
-        />
-        <span>
-          Saya menyatakan data ini benar dan penelitian mengikuti Deklarasi Helsinki serta
-          ketentuan Komite Etik Penelitian Unpad.
-        </span>
-      </label>
+      {readOnly ? null : (
+        <label className="mt-4 flex items-start gap-2.5 text-[13.5px] text-ink-soft">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => onAgree(e.target.checked)}
+            className="mt-0.5 size-4 accent-[#003d7a]"
+          />
+          <span>
+            Saya menyatakan data ini benar dan penelitian mengikuti Deklarasi Helsinki serta
+            ketentuan Komite Etik Penelitian Unpad.
+          </span>
+        </label>
+      )}
     </div>
   );
 }

@@ -69,6 +69,29 @@ export async function me() {
   return request("/api/auth/me", { credentials: "include" });
 }
 
+export async function updateProfile(payload) {
+  return request("/api/auth/profile", {
+    method: "PATCH",
+    body: {
+      name: payload.name,
+      gender: payload.gender,
+      phone: payload.phone,
+      institution: payload.institution,
+    },
+  });
+}
+
+export async function changePassword(payload) {
+  return request("/api/auth/change-password", {
+    method: "POST",
+    body: {
+      currentPassword: payload.currentPassword,
+      password: payload.password,
+      confirmPassword: payload.confirmPassword,
+    },
+  });
+}
+
 export async function logout() {
   try {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });

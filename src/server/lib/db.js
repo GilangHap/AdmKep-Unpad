@@ -18,8 +18,8 @@ const config = {
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
 };
 
-// Two additive changes only: a gender column used by the new registration form,
-// and a table for email-activation tokens (the old app had neither).
+// Additive schema only: the legacy tables are never altered destructively.
+// Each block is idempotent so it can run on every connect.
 const SCHEMA_SQL = `
 IF COL_LENGTH('dbo.t_user', 'c_gender') IS NULL
   ALTER TABLE dbo.t_user ADD c_gender char(1) NULL;
@@ -74,6 +74,54 @@ BEGIN
     last_seen_at datetime2 NULL
   );
   CREATE INDEX IX_t_user_session_user ON dbo.t_user_session(user_id, expires_at);
+END;
+
+IF OBJECT_ID(N'dbo.tm_pembimbing', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.tm_pembimbing (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_tm_pembimbing PRIMARY KEY,
+    id_penelitian int NULL,
+    id_pegawai int NULL,
+    n_nama varchar(150) NULL,
+    c_statusdelete char(1) NULL CONSTRAINT DF_tm_pembimbing_c_statusdelete DEFAULT ('N'),
+    biodata_lain nvarchar(max) NULL
+  );
+END;
+
+IF OBJECT_ID(N'dbo.tm_peneliti_etik_asing', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.tm_peneliti_etik_asing (
+    id_peneliti_asing int IDENTITY(1,1) NOT NULL CONSTRAINT PK_tm_peneliti_etik_asing PRIMARY KEY,
+    id_penelitian int NOT NULL,
+    n_nama_asing varchar(255) NOT NULL,
+    n_tugas_asing varchar(max) NULL,
+    n_kontak_asing varchar(255) NULL,
+    d_entry datetime NULL CONSTRAINT DF_tm_peneliti_etik_asing_d_entry DEFAULT (GETDATE())
+  );
+END;
+
+IF OBJECT_ID(N'dbo.tr_peruntukan', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.tr_peruntukan (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_tr_peruntukan PRIMARY KEY,
+    c_peruntukan char(1) NULL,
+    n_peruntukan varchar(50) NULL,
+    c_statusdelete char(1) NULL CONSTRAINT DF_tr_peruntukan_c_statusdelete DEFAULT ('N')
+  );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.tr_peruntukan)
+BEGIN
+  SET IDENTITY_INSERT dbo.tr_peruntukan ON;
+  INSERT INTO dbo.tr_peruntukan (id, c_peruntukan, n_peruntukan, c_statusdelete) VALUES
+    (3, 'D', 'Disertasi', 'N'),
+    (4, 'K', 'Kerjasama', 'N'),
+    (6, 'H', 'Hibah', 'N'),
+    (8, 'L', 'Lainnya', 'N'),
+    (9, 'S', 'Skripsi', 'N'),
+    (10, 'T', 'Tesis', 'N'),
+    (11, 'P', 'PKM  (Program kreativitas Mahasiswa/Kompetisi)', 'N');
+  SET IDENTITY_INSERT dbo.tr_peruntukan OFF;
 END;
 `;
 

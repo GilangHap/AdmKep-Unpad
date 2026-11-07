@@ -142,3 +142,86 @@
     transform: none;
   }
 }
+
+/* WYSIWYG (Quill) tuned to the portal's form controls. */
+.rich-text {
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-canvas);
+  overflow: hidden;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.rich-text:focus-within {
+  border-color: var(--color-brand);
+  background: var(--color-surface);
+}
+.rich-text[data-invalid='true'] {
+  border-color: var(--color-red);
+}
+.rich-text .ql-toolbar.ql-snow {
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-canvas-deep);
+  padding: 6px 8px;
+  font-family: var(--font-body);
+}
+.rich-text .ql-container.ql-snow {
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+}
+.rich-text .ql-editor {
+  min-height: 150px;
+  color: var(--color-ink);
+  line-height: 1.55;
+}
+.rich-text .ql-editor.ql-blank::before {
+  color: var(--color-ink-faint);
+  font-style: normal;
+}
+.rich-text .ql-snow .ql-stroke {
+  stroke: var(--color-ink-soft);
+}
+.rich-text .ql-snow .ql-fill {
+  fill: var(--color-ink-soft);
+}
+.rich-text .ql-snow .ql-picker {
+  color: var(--color-ink-soft);
+}
+.rich-text .ql-snow .ql-picker-options {
+  border-color: var(--color-line);
+}
+.rich-text .ql-snow button:hover .ql-stroke,
+.rich-text .ql-snow button.ql-active .ql-stroke {
+  stroke: var(--color-brand);
+}
+.rich-text .ql-snow button:hover .ql-fill,
+.rich-text .ql-snow button.ql-active .ql-fill {
+  fill: var(--color-brand);
+}
+
+
+/* The editor must let its pickers open past the frame and be resizable. */
+.rich-text {
+  position: relative;
+  overflow: visible;
+}
+.rich-text .ql-toolbar.ql-snow {
+  position: relative;
+  z-index: 20;
+  border-radius: 12px 12px 0 0;
+}
+.rich-text .ql-container.ql-snow {
+  border-radius: 0 0 12px 12px;
+  background: transparent;
+}
+.rich-text .ql-editor {
+  min-height: 150px;
+  max-height: 70vh;
+  overflow-y: auto;
+  resize: vertical;
+}
+.rich-text .ql-picker-options {
+  z-index: 30;
+}
+

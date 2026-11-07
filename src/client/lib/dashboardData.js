@@ -83,13 +83,13 @@ export const SUBMISSIONS = [
 export const CONTACTS = [
   {
     name: "Ibu Novi Rohyanti",
-    scope: "Pengajuan baru data primer mahasiswa (S1/S2/S3), reset kata sandi",
+    scope: "Pengajuan baru data primer mahasiswa (S1, S2, S3)",
     phone: "0812-6626-6418",
     wa: "https://wa.me/6281266266418",
   },
   {
     name: "Pak Diya Kusbini",
-    scope: "Data sekunder, hewan coba, laporan akhir",
+    scope: "Data sekunder, hewan coba, laporan akhir, reset kata sandi",
     phone: "0822-9503-5418",
     wa: "https://wa.me/6282295035418",
   },

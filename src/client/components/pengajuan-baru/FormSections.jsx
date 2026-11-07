@@ -1,8 +1,16 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useWatch } from "react-hook-form";
+import { Download, FileText, Upload } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { Field, Input, Select } from "@/components/ui/FormControl";
 import { DynamicRows } from "@/components/pengajuan-baru/DynamicTable";
+
+// Quill is only needed on the steps with long text, so it ships as its own chunk.
+const RichText = lazy(() =>
+  import("@/components/pengajuan-baru/RichText").then((mod) => ({ default: mod.RichText })),
+);
 import {
+  DOKUMEN_KELOMPOK,
   FOKUS,
   GATE_STEPS,
   JENIS_SUBJEK,
@@ -13,25 +21,27 @@ import {
   STATUS_ETIK_LAIN,
   SUMBER_DANA,
   YA_TIDAK,
+  dokumenDariGate,
 } from "@/lib/pengajuanBaruData";
 import { kelompokDariGate } from "@/lib/pengajuanBaruSchema";
 
 // Alur gate legacy: tiap jawaban membuka pertanyaan berikutnya dan menetapkan kelompok formulir.
 function gateFlow(c_jenis_subjek, fetik_p1, fetik_p1_tdk, fetik_p1_tdk_tdk) {
-  if (c_jenis_subjek === "1") {
-    if (fetik_p1 === "Y") return { gates: ["fetik_p1"], fokus: false, c_kelompok: "5" };
-    if (fetik_p1 === "N") {
-      if (fetik_p1_tdk === "Y") return { gates: ["fetik_p1", "fetik_p1_tdk"], fokus: false, c_kelompok: "7" };
-      if (fetik_p1_tdk === "N") {
-        if (fetik_p1_tdk_tdk === "Y") return { gates: ["fetik_p1", "fetik_p1_tdk", "fetik_p1_tdk_tdk"], fokus: false, c_kelompok: "2" };
-        if (fetik_p1_tdk_tdk === "N") return { gates: ["fetik_p1", "fetik_p1_tdk", "fetik_p1_tdk_tdk"], fokus: true, c_kelompok: "" };
-      }
-      return { gates: ["fetik_p1", "fetik_p1_tdk"], fokus: false, c_kelompok: "" };
-    }
-    return { gates: ["fetik_p1"], fokus: false, c_kelompok: "" };
-  }
   if (c_jenis_subjek === "3") return { gates: [], fokus: false, c_kelompok: "5" };
-  return { gates: [], fokus: false, c_kelompok: "" };
+  if (c_jenis_subjek !== "1") return { gates: [], fokus: false, c_kelompok: "" };
+
+  const gates = ["fetik_p1"];
+  if (fetik_p1 === "Y") return { gates, fokus: false, c_kelompok: "5" };
+  if (fetik_p1 !== "N") return { gates, fokus: false, c_kelompok: "" };
+
+  gates.push("fetik_p1_tdk");
+  if (fetik_p1_tdk === "Y") return { gates, fokus: false, c_kelompok: "7" };
+  if (fetik_p1_tdk !== "N") return { gates, fokus: false, c_kelompok: "" };
+
+  gates.push("fetik_p1_tdk_tdk");
+  if (fetik_p1_tdk_tdk === "Y") return { gates, fokus: false, c_kelompok: "2" };
+  if (fetik_p1_tdk_tdk === "N") return { gates, fokus: true, c_kelompok: "" };
+  return { gates, fokus: false, c_kelompok: "" };
 }
 
 const AREA =
@@ -65,17 +75,100 @@ function Section({ title, children }) {
   );
 }
 
-function Step1({ register, errors, control, setValue }) {
+function FileField({ label, name, value, recordId, onUpload, uploading, readOnly }) {
+  const inputId = `file-${name}`;
+  const [dragging, setDragging] = useState(false);
+  const disabled = readOnly || uploading;
+  const take = (files) => {
+    const file = files?.[0];
+    if (file) onUpload(name, file);
+  };
+
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 text-[14px] font-medium text-ink">{label}</p>
+      <div
+        onDragOver={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          if (!disabled) take(event.dataTransfer.files);
+        }}
+        className={cn(
+          "relative rounded-xl border p-3 transition-colors duration-150",
+          dragging ? "border-brand bg-primary-soft" : "border-line bg-canvas",
+        )}
+      >
+        <input
+          id={inputId}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          className="sr-only"
+          disabled={disabled}
+          aria-describedby={`${inputId}-hint`}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) take([file]);
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className={value ? "text-brand" : "text-ink-faint"} aria-hidden="true">
+            {value ? <FileText className="size-4" /> : <Upload className="size-4" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium text-ink">
+              {value ? "Dokumen tersimpan" : "Belum ada dokumen"}
+            </p>
+            {value && recordId ? (
+              <a
+                href={`/api/pengajuan-baru/${recordId}/files/${name}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-0.5 inline-flex items-center gap-1 text-[12.5px] text-brand hover:underline"
+              >
+                <Download className="size-3.5" aria-hidden="true" /> Unduh
+              </a>
+            ) : null}
+          </div>
+          {disabled ? null : (
+            <label
+              htmlFor={inputId}
+              className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-control bg-surface px-3 text-[12.5px] font-medium text-ink transition-colors duration-150 hover:border-brand hover:text-brand"
+            >
+              {value ? "Ganti" : "Pilih file"}
+            </label>
+          )}
+        </div>
+        <p id={`${inputId}-hint`} className="mt-2 text-[12px] text-ink-faint">
+          {uploading
+            ? "Mengunggah…"
+            : value
+              ? "Seret file baru untuk mengganti."
+              : "PDF, JPG, atau PNG · maks 10 MB. Bisa juga seret file ke sini."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Step1({ register, errors, control, setValue, isExisting }) {
   const values = useWatch({ control }) ?? {};
   const showHewan = values.c_jenis_subjek === "2";
   const flow = gateFlow(values.c_jenis_subjek, values.fetik_p1, values.fetik_p1_tdk, values.fetik_p1_tdk_tdk);
   const gates = GATE_STEPS.filter((g) => flow.gates.includes(g.key));
-  const fokus = flow.fokus && values.fetik_fokus ? FOKUS.jenis[values.fetik_fokus] : null;
+  const fokus = flow.fokus;
   const c_kelompok =
     kelompokDariGate(values) ||
     (values.c_jenis_subjek === "2" && values.hwn_hidup_mati === "1" ? "3" : "") ||
     (values.c_jenis_subjek === "2" && values.hwn_hidup_mati === "2" ? "6" : "") ||
     flow.c_kelompok;
+  const dokumen = dokumenDariGate(values) ?? DOKUMEN_KELOMPOK[c_kelompok];
 
   useEffect(() => {
     if (values.c_kelompok !== c_kelompok) {
@@ -86,8 +179,19 @@ function Step1({ register, errors, control, setValue }) {
   return (
     <>
       <Section title="Pilih kelompok / jenis formulir">
-        <Field label="Jenis subjek" htmlFor="c_jenis_subjek" required error={errors.c_jenis_subjek?.message}>
-          <Select id="c_jenis_subjek" invalid={!!errors.c_jenis_subjek} {...register("c_jenis_subjek")}>
+        <Field
+          label="Jenis subjek"
+          htmlFor="c_jenis_subjek"
+          required
+          hint={isExisting ? "Jenis subjek tidak dapat diubah setelah draf tersimpan." : undefined}
+          error={errors.c_jenis_subjek?.message}
+        >
+          <Select
+            id="c_jenis_subjek"
+            invalid={!!errors.c_jenis_subjek}
+            disabled={isExisting}
+            {...register("c_jenis_subjek")}
+          >
             {options(JENIS_SUBJEK)}
           </Select>
         </Field>
@@ -111,21 +215,52 @@ function Step1({ register, errors, control, setValue }) {
           <Field label={FOKUS.label} htmlFor="fetik_fokus" className="sm:col-span-2">
             <Select id="fetik_fokus" {...register("fetik_fokus")}>
               <option value="">-- Pilih --</option>
-              {options(FOKUS.list)}
+              {options(Object.values(FOKUS.jenis))}
             </Select>
           </Field>
         ) : null}
-        {values.c_kelompok ? (
-          <Field label="Kelompok formulir etik" htmlFor="c_kelompok" required error={errors.c_kelompok?.message} className="sm:col-span-2">
-            <Select id="c_kelompok" invalid={!!errors.c_kelompok} {...register("c_kelompok")}>
-              {options(KELOMPOK)}
-            </Select>
-          </Field>
-        ) : (
-          <p className="rounded-xl border border-dashed border-control bg-canvas p-4 text-[12.5px] text-ink-soft sm:col-span-2">
-            Kelompok formulir etik dipilih otomatis dari jawaban di atas.
+        <Field label="Kelompok formulir etik" htmlFor="c_kelompok" required error={errors.c_kelompok?.message} className="sm:col-span-2">
+          <input id="c_kelompok" type="hidden" {...register("c_kelompok")} />
+          <p className="rounded-xl border border-line bg-canvas-deep/60 px-3.5 py-3 text-[15px] font-semibold text-ink">
+            {KELOMPOK.find((o) => o.value === c_kelompok)?.label ??
+              "Akan terisi otomatis dari jawaban di atas."}
           </p>
-        )}
+        </Field>
+        {dokumen ? (
+          <div className="rounded-xl border border-line bg-canvas-deep/60 p-4 sm:col-span-2">
+            <p className="text-[13px] font-semibold text-ink">Dokumen-dokumen yang harus ada</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-[12.5px] text-ink-soft">
+              {dokumen.map((item) => (
+                <li key={item.label}>
+                  {item.url ? (
+                    <a
+                      className="inline-flex items-center gap-1 text-brand hover:underline"
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.label}
+                      <Download className="size-3.5 shrink-0" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    item.label
+                  )}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2.5 text-[12px] text-ink-faint">
+              Formulir dan persyaratan lengkap di{" "}
+              <a
+                className="text-brand hover:underline"
+                href="https://kep.unpad.ac.id/layanan/persyaratan"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                kep.unpad.ac.id/layanan/persyaratan
+              </a>
+            </p>
+          </div>
+        ) : null}
       </Section>
 
       <Section title="1. Informasi umum peneliti utama">
@@ -224,8 +359,9 @@ function Step1({ register, errors, control, setValue }) {
   );
 }
 
-function Step2({ register, errors, values, control }) {
-  const words = (values.ringkasan_penelitian ?? "").trim().split(/\s+/).filter(Boolean).length;
+function Step2({ register, errors, values, control, recordId, onUpload, uploadingSlot, readOnly }) {
+  const plainRingkasan = (values.ringkasan_penelitian ?? "").replace(/<[^>]*>/g, " ");
+  const words = plainRingkasan.trim().split(/\s+/).filter(Boolean).length;
   const kerja = values.c_kerjasama === "2" || values.c_kerjasama === "3";
 
   return (
@@ -255,7 +391,17 @@ function Step2({ register, errors, values, control }) {
           error={errors.ringkasan_penelitian?.message}
           className="sm:col-span-2"
         >
-          <Area id="ringkasan_penelitian" rows={6} invalid={!!errors.ringkasan_penelitian} {...register("ringkasan_penelitian")} />
+          {({ describedBy }) => (
+            <Suspense fallback={<div className="min-h-[198px] rounded-xl border border-line bg-canvas" />}>
+              <RichText
+                control={control}
+                name="ringkasan_penelitian"
+                describedBy={describedBy}
+                invalid={!!errors.ringkasan_penelitian}
+                readOnly={readOnly}
+              />
+            </Suspense>
+          )}
         </Field>
         <Field label="Tujuan penelitian" htmlFor="tujuan_penelitian" required error={errors.tujuan_penelitian?.message} className="sm:col-span-2">
           <Area id="tujuan_penelitian" rows={3} invalid={!!errors.tujuan_penelitian} {...register("tujuan_penelitian")} />
@@ -273,11 +419,11 @@ function Step2({ register, errors, values, control }) {
         </Field>
         {values.c_multisenter === "Y" ? (
           <>
-            <Field label="Senter utama (lembaga, kota, negara)" htmlFor="c_spu">
-              <Input id="c_spu" {...register("c_spu")} />
+            <Field label="Senter utama (lembaga, kota, negara)" htmlFor="c_spu" required error={errors.c_spu?.message}>
+              <Input id="c_spu" invalid={!!errors.c_spu} {...register("c_spu")} />
             </Field>
-            <Field label="Senter satelit (lembaga, kota, negara)" htmlFor="c_sps">
-              <Input id="c_sps" {...register("c_sps")} />
+            <Field label="Senter satelit (lembaga, kota, negara)" htmlFor="c_sps" required error={errors.c_sps?.message}>
+              <Input id="c_sps" invalid={!!errors.c_sps} {...register("c_sps")} />
             </Field>
           </>
         ) : null}
@@ -302,23 +448,34 @@ function Step2({ register, errors, values, control }) {
           </Field>
         ) : null}
         {kerja ? (
-          <div className="rounded-xl border border-dashed border-control bg-canvas p-4 sm:col-span-2">
-            <p className="text-[13px] font-semibold text-ink">Lampiran kerjasama</p>
-            <p className="mt-1 text-[12.5px] text-ink-soft">
-              Unggah dokumen diaktifkan saat backend tersambung.
-            </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {[
-                ["Izin peneliti asing", "file_izin_asing"],
-                ["Draft MoU", "file_mou"],
-                ["Draft MTA", "file_mta"],
-              ].map(([label, id]) => (
-                <label key={id} htmlFor={id} className="block text-[12.5px] text-ink-soft">
-                  {label}
-                  <input id={id} type="file" disabled className="mt-1 block w-full text-[12px] disabled:opacity-60" />
-                </label>
-              ))}
-            </div>
+          <div className="grid gap-3 sm:col-span-2">
+            <FileField
+              label="Izin peneliti asing (bila terlibat langsung di Indonesia)"
+              name="file_izin_asing"
+              value={values.file_izin_asing}
+              recordId={recordId}
+              onUpload={onUpload}
+              uploading={uploadingSlot === "file_izin_asing"}
+              readOnly={readOnly}
+            />
+            <FileField
+              label="Draft MoU institusi"
+              name="file_mou"
+              value={values.file_mou}
+              recordId={recordId}
+              onUpload={onUpload}
+              uploading={uploadingSlot === "file_mou"}
+              readOnly={readOnly}
+            />
+            <FileField
+              label="Draft MTA (bila material/data dibagikan ke luar negeri)"
+              name="file_mta"
+              value={values.file_mta}
+              recordId={recordId}
+              onUpload={onUpload}
+              uploading={uploadingSlot === "file_mta"}
+              readOnly={readOnly}
+            />
           </div>
         ) : null}
       </Section>
@@ -342,7 +499,7 @@ function Step2({ register, errors, values, control }) {
   );
 }
 
-function Step3({ register, errors, values }) {
+function Step3({ register, errors, values, control, recordId, onUpload, uploadingSlot, readOnly }) {
   const butuhDokumenEtik = values.c_etik_lain === "Y";
 
   return (
@@ -381,16 +538,32 @@ function Step3({ register, errors, values }) {
                 {options(STATUS_ETIK_LAIN)}
               </Select>
             </Field>
-            <div className="rounded-xl border border-dashed border-control bg-canvas p-4 text-[12.5px] text-ink-soft sm:col-span-2">
-              Unggah dokumen keputusan diaktifkan saat backend tersambung.
-            </div>
+            <FileField
+              label="Dokumen keputusan komite etik lain"
+              name="file_etik_lain"
+              value={values.file_etik_lain}
+              recordId={recordId}
+              onUpload={onUpload}
+              uploading={uploadingSlot === "file_etik_lain"}
+              readOnly={readOnly}
+            />
           </>
         ) : null}
       </Section>
 
       <Section title="11. Alokasi dan rincian dana">
         <Field label="Rincian dana penelitian" htmlFor="s_rincian_dana" required error={errors.s_rincian_dana?.message} className="sm:col-span-2">
-          <Area id="s_rincian_dana" rows={6} invalid={!!errors.s_rincian_dana} {...register("s_rincian_dana")} />
+          {({ describedBy }) => (
+            <Suspense fallback={<div className="min-h-[198px] rounded-xl border border-line bg-canvas" />}>
+              <RichText
+                control={control}
+                name="s_rincian_dana"
+                describedBy={describedBy}
+                invalid={!!errors.s_rincian_dana}
+                readOnly={readOnly}
+              />
+            </Suspense>
+          )}
         </Field>
       </Section>
 
@@ -401,8 +574,8 @@ function Step3({ register, errors, values }) {
           </Select>
         </Field>
         {values.c_coi === "Y" ? (
-          <Field label="Uraikan siapa dan bentuk CoI-nya" htmlFor="u_coi" className="sm:col-span-2">
-            <Area id="u_coi" rows={3} {...register("u_coi")} />
+          <Field label="Uraikan siapa dan bentuk CoI-nya" htmlFor="u_coi" required error={errors.u_coi?.message} className="sm:col-span-2">
+            <Area id="u_coi" rows={3} invalid={!!errors.u_coi} {...register("u_coi")} />
           </Field>
         ) : null}
       </Section>

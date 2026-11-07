@@ -2,7 +2,9 @@
 // Creates the additive schema, then verifies the t_user mapping is readable.
 import assert from "node:assert/strict";
 import { getPool } from "../src/server/lib/db.js";
-import { findByEmail, countActivationsSince, searchEthics } from "../src/server/lib/store.js";
+import { findByEmail } from "../src/server/lib/repositories/users.js";
+import { countActivationsSince } from "../src/server/lib/repositories/activations.js";
+import { searchEthics } from "../src/server/lib/repositories/ethics.js";
 
 const pool = await getPool();
 const tables = await pool
