@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useFieldArray } from "react-hook-form";
+import { cn } from "@/lib/cn";
 import { Input } from "@/components/ui/FormControl";
 
 export function DynamicRows({ control, register, name, columns, addLabel }) {
@@ -13,7 +14,7 @@ export function DynamicRows({ control, register, name, columns, addLabel }) {
             <tr>
               <th className="w-10 px-3 py-2 text-[12px] font-semibold text-ink-faint">No</th>
               {columns.map((c) => (
-                <th key={c.key} className="px-3 py-2 text-[12px] font-semibold text-ink-faint">
+                <th key={c.key} className={cn("px-3 py-2 text-[12px] font-semibold text-ink-faint", c.wide && "w-[55%]")}>
                   {c.label}
                 </th>
               ))}
@@ -25,7 +26,7 @@ export function DynamicRows({ control, register, name, columns, addLabel }) {
               <tr key={field.id}>
                 <td className="px-3 py-2 text-[13px] text-ink-faint">{index + 1}</td>
                 {columns.map((c) => (
-                  <td key={c.key} className="px-3 py-2">
+                  <td key={c.key} className={cn("px-3 py-2", c.wide && "w-[55%]")}>
                     <Input
                       aria-label={`${c.label} baris ${index + 1}`}
                       placeholder={c.placeholder}

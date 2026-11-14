@@ -9,6 +9,9 @@ import DashboardPage from "@/pages/app/DashboardPage";
 import ModulePage from "@/pages/app/ModulePage";
 import PengajuanBaruListPage from "@/pages/app/PengajuanBaruListPage";
 import PengajuanBaruFormPage from "@/pages/app/PengajuanBaruFormPage";
+import PengajuanBaruSectionPage from "@/pages/app/PengajuanBaruSectionPage";
+import PengajuanBaruDokumenPage from "@/pages/app/PengajuanBaruDokumenPage";
+import PengajuanBaruCetakPage from "@/pages/app/PengajuanBaruCetakPage";
 import SettingsPage from "@/pages/app/SettingsPage";
 import { AuthProvider, GuestOnly, RequireAuth } from "@/lib/AuthProvider";
 
@@ -72,6 +75,9 @@ export default function App() {
         <Route path="/app/pengajuan-baru" element={<RequireAuth><PengajuanBaruListPage /></RequireAuth>} />
         <Route path="/app/pengajuan-baru/baru" element={<RequireAuth><PengajuanBaruFormPage /></RequireAuth>} />
         <Route path="/app/pengajuan-baru/:id" element={<RequireAuth><PengajuanBaruFormPage /></RequireAuth>} />
+        <Route path="/app/pengajuan-baru/:id/bagian/:bagian" element={<RequireAuth><PengajuanBaruSectionPage /></RequireAuth>} />
+        <Route path="/app/pengajuan-baru/:id/dokumen" element={<RequireAuth><PengajuanBaruDokumenPage /></RequireAuth>} />
+        <Route path="/app/pengajuan-baru/:id/cetak" element={<RequireAuth><PengajuanBaruCetakPage /></RequireAuth>} />
         {MODULES.map((m) => (
           <Route
             key={m.path}

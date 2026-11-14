@@ -159,7 +159,7 @@ function FileField({ label, name, value, recordId, onUpload, uploading, readOnly
   );
 }
 
-function Step1({ register, errors, control, setValue, isExisting }) {
+function Step1({ register, errors, control, setValue, isExisting, submitted }) {
   const values = useWatch({ control }) ?? {};
   const showHewan = values.c_jenis_subjek === "2";
   const flow = gateFlow(values.c_jenis_subjek, values.fetik_p1, values.fetik_p1_tdk, values.fetik_p1_tdk_tdk);
@@ -171,6 +171,8 @@ function Step1({ register, errors, control, setValue, isExisting }) {
     (values.c_jenis_subjek === "2" && values.hwn_hidup_mati === "2" ? "6" : "") ||
     flow.c_kelompok;
   const dokumen = dokumenDariGate(values) ?? DOKUMEN_KELOMPOK[c_kelompok];
+  // Turunan dari jenis subjek ikut terkunci setelah baris tersimpan (kelompok sudah pasti).
+  const gateLocked = isExisting && Boolean(c_kelompok);
 
   useEffect(() => {
     if (values.c_kelompok !== c_kelompok) {
@@ -180,47 +182,75 @@ function Step1({ register, errors, control, setValue, isExisting }) {
 
   return (
     <>
-      <Section title="Pilih kelompok / jenis formulir">
-        <Field
-          label="Jenis subjek"
-          htmlFor="c_jenis_subjek"
-          required
-          hint={isExisting ? "Jenis subjek tidak dapat diubah setelah draf tersimpan." : undefined}
-          error={errors.c_jenis_subjek?.message}
-        >
-          <Select
-            id="c_jenis_subjek"
-            invalid={!!errors.c_jenis_subjek}
-            disabled={isExisting}
-            {...register("c_jenis_subjek")}
-          >
-            {options(JENIS_SUBJEK)}
-          </Select>
-        </Field>
-        {gates.map((gate) => (
-          <Field key={gate.key} label={gate.label} htmlFor={gate.key} hint={gate.hint} required error={errors[gate.key]?.message} className="sm:col-span-2">
-            <Select id={gate.key} invalid={!!errors[gate.key]} {...register(gate.key)}>
-              {options(YA_TIDAK)}
-            </Select>
-          </Field>
-        ))}
-        {showHewan ? (
-          <Field label="Jenis penelitian hewan" htmlFor="hwn_hidup_mati" required error={errors.hwn_hidup_mati?.message} className="sm:col-span-2">
-            <Select id="hwn_hidup_mati" invalid={!!errors.hwn_hidup_mati} {...register("hwn_hidup_mati")}>
-              <option value="">-- Pilih --</option>
-              <option value="1">Hewan hidup (in-vivo)</option>
-              <option value="2">BBT hewan (ex-vivo / arsip)</option>
-            </Select>
-          </Field>
-        ) : null}
-        {fokus ? (
-          <Field label={FOKUS.label} htmlFor="fetik_fokus" className="sm:col-span-2">
-            <Select id="fetik_fokus" {...register("fetik_fokus")}>
-              <option value="">-- Pilih --</option>
-              {options(Object.values(FOKUS.jenis))}
-            </Select>
-          </Field>
-        ) : null}
+      <Section title={submitted ? "Kelompok formulir etik" : "Pilih kelompok / jenis formulir"}>
+        {submitted ? (
+          // Setelah dikirim, jawaban gate terkunci: nilainya tetap dikirim lewat input
+          // tersembunyi, tapi tidak lagi ditampilkan.
+          <>
+            <input type="hidden" {...register("c_jenis_subjek")} />
+            <input type="hidden" {...register("fetik_p1")} />
+            <input type="hidden" {...register("fetik_p1_tdk")} />
+            <input type="hidden" {...register("fetik_p1_tdk_tdk")} />
+            <input type="hidden" {...register("fetik_fokus")} />
+            <input type="hidden" {...register("hwn_hidup_mati")} />
+          </>
+        ) : (
+          <>
+            <Field
+              label="Jenis subjek"
+              htmlFor="c_jenis_subjek"
+              required
+              hint={isExisting ? "Jenis subjek tidak dapat diubah setelah draf tersimpan." : undefined}
+              error={errors.c_jenis_subjek?.message}
+            >
+              <Select
+                id="c_jenis_subjek"
+                invalid={!!errors.c_jenis_subjek}
+                disabled={isExisting}
+                {...register("c_jenis_subjek")}
+              >
+                {options(JENIS_SUBJEK)}
+              </Select>
+            </Field>
+            {gates.map((gate) => (
+              <Field
+                key={gate.key}
+                label={gate.label}
+                htmlFor={gate.key}
+                hint={gateLocked ? "Tidak dapat diubah setelah draf tersimpan." : gate.hint}
+                required
+                error={errors[gate.key]?.message}
+                className="sm:col-span-2"
+              >
+                <Select
+                  id={gate.key}
+                  invalid={!!errors[gate.key]}
+                  disabled={gateLocked}
+                  {...register(gate.key)}
+                >
+                  {options(YA_TIDAK)}
+                </Select>
+              </Field>
+            ))}
+            {showHewan ? (
+              <Field label="Jenis penelitian hewan" htmlFor="hwn_hidup_mati" required error={errors.hwn_hidup_mati?.message} className="sm:col-span-2">
+                <Select id="hwn_hidup_mati" invalid={!!errors.hwn_hidup_mati} disabled={gateLocked} {...register("hwn_hidup_mati")}>
+                  <option value="">-- Pilih --</option>
+                  <option value="1">Hewan hidup (in-vivo)</option>
+                  <option value="2">BBT hewan (ex-vivo / arsip)</option>
+                </Select>
+              </Field>
+            ) : null}
+            {fokus ? (
+              <Field label={FOKUS.label} htmlFor="fetik_fokus" className="sm:col-span-2">
+                <Select id="fetik_fokus" disabled={gateLocked} {...register("fetik_fokus")}>
+                  <option value="">-- Pilih --</option>
+                  {options(Object.values(FOKUS.jenis))}
+                </Select>
+              </Field>
+            ) : null}
+          </>
+        )}
         <Field label="Kelompok formulir etik" htmlFor="c_kelompok" required error={errors.c_kelompok?.message} className="sm:col-span-2">
           <input id="c_kelompok" type="hidden" {...register("c_kelompok")} />
           <p className="rounded-xl border border-line bg-canvas-deep/60 px-3.5 py-3 text-[15px] font-semibold text-ink">
@@ -266,13 +296,13 @@ function Step1({ register, errors, control, setValue, isExisting }) {
       </Section>
 
       <Section title="1. Informasi umum peneliti utama">
-        <Field label="Nama peneliti utama" htmlFor="n_peneliti_u" required error={errors.n_peneliti_u?.message}>
+        <Field label="Nama peneliti utama" htmlFor="n_peneliti_u" required error={errors.n_peneliti_u?.message} className="sm:col-span-2">
           <Input id="n_peneliti_u" invalid={!!errors.n_peneliti_u} {...register("n_peneliti_u")} />
         </Field>
-        <Field label="Keahlian / spesialisasi" htmlFor="n_keahlian" required error={errors.n_keahlian?.message}>
+        <Field label="Keahlian / spesialisasi" htmlFor="n_keahlian" required error={errors.n_keahlian?.message} className="sm:col-span-2">
           <Input id="n_keahlian" invalid={!!errors.n_keahlian} {...register("n_keahlian")} />
         </Field>
-        <Field label="Jabatan / kedudukan" htmlFor="n_kedudukan" required error={errors.n_kedudukan?.message}>
+        <Field label="Jabatan / kedudukan" htmlFor="n_kedudukan" required error={errors.n_kedudukan?.message} className="sm:col-span-2">
           <Input id="n_kedudukan" invalid={!!errors.n_kedudukan} {...register("n_kedudukan")} />
         </Field>
         <Field label="No HP peneliti utama" htmlFor="n_hp" required error={errors.n_hp?.message}>
@@ -289,7 +319,7 @@ function Step1({ register, errors, control, setValue, isExisting }) {
       </Section>
 
       <Section title="Kontak person">
-        <Field label="Nama kontak person" htmlFor="n_cp" required error={errors.n_cp?.message}>
+        <Field label="Nama kontak person" htmlFor="n_cp" required error={errors.n_cp?.message} className="sm:col-span-2">
           <Input id="n_cp" invalid={!!errors.n_cp} {...register("n_cp")} />
         </Field>
         <Field label="No HP kontak person" htmlFor="hp_cp" required error={errors.hp_cp?.message}>
@@ -353,7 +383,7 @@ function Step1({ register, errors, control, setValue, isExisting }) {
             register={register}
             name="pembimbing"
             addLabel="Tambah pembimbing"
-            columns={[{ key: "n_nama", label: "Nama lengkap & gelar", placeholder: "Nama & gelar" }]}
+            columns={[{ key: "n_nama", label: "Nama lengkap & gelar", placeholder: "Nama & gelar", wide: true }]}
           />
         ) : null}
       </Section>
@@ -382,7 +412,7 @@ function Step2({ register, errors, values, control, recordId, onUpload, uploadin
         <Field label="Versi protokol" htmlFor="ver_pro" required error={errors.ver_pro?.message}>
           <Input id="ver_pro" invalid={!!errors.ver_pro} {...register("ver_pro")} />
         </Field>
-        <Field label="Bidang ilmu" htmlFor="bidang_ilmu" required error={errors.bidang_ilmu?.message}>
+        <Field label="Bidang ilmu" htmlFor="bidang_ilmu" required error={errors.bidang_ilmu?.message} className="sm:col-span-2">
           <Input id="bidang_ilmu" invalid={!!errors.bidang_ilmu} {...register("bidang_ilmu")} />
         </Field>
         <Field
@@ -421,10 +451,10 @@ function Step2({ register, errors, values, control, recordId, onUpload, uploadin
         </Field>
         {values.c_multisenter === "Y" ? (
           <>
-            <Field label="Senter utama (lembaga, kota, negara)" htmlFor="c_spu" required error={errors.c_spu?.message}>
+            <Field label="Senter utama (lembaga, kota, negara)" htmlFor="c_spu" required error={errors.c_spu?.message} className="sm:col-span-2">
               <Input id="c_spu" invalid={!!errors.c_spu} {...register("c_spu")} />
             </Field>
-            <Field label="Senter satelit (lembaga, kota, negara)" htmlFor="c_sps" required error={errors.c_sps?.message}>
+            <Field label="Senter satelit (lembaga, kota, negara)" htmlFor="c_sps" required error={errors.c_sps?.message} className="sm:col-span-2">
               <Input id="c_sps" invalid={!!errors.c_sps} {...register("c_sps")} />
             </Field>
           </>
@@ -490,7 +520,7 @@ function Step2({ register, errors, values, control, recordId, onUpload, uploadin
             name="peneliti_asing"
             addLabel="Tambah peneliti asing"
             columns={[
-              { key: "n_nama_asing", label: "Nama, gelar, institusi", placeholder: "Nama, gelar, institusi" },
+              { key: "n_nama_asing", label: "Nama, gelar, institusi", placeholder: "Nama, gelar, institusi", wide: true },
               { key: "n_tugas_asing", label: "Tugas & fungsi", placeholder: "Tugas & fungsi" },
               { key: "n_kontak_asing", label: "Telp / email", placeholder: "Telp/Fax/HP/Email" },
             ]}

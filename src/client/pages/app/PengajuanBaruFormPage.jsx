@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
@@ -14,6 +14,7 @@ import { EMPTY_PENGAJUAN } from "@/lib/pengajuanBaruData";
 import { STEP_FIELDS, STEP_LABELS, allSchema } from "@/lib/pengajuanBaruSchema";
 import {
   createPengajuan,
+  getFormLimits,
   getPengajuan,
   submitPengajuan,
   updatePengajuan,
@@ -43,8 +44,12 @@ const fromItem = (item) => ({
 export default function PengajuanBaruFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [recordId, setRecordId] = useState(id ?? null);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => {
+    const target = Number(searchParams.get("langkah"));
+    return Number.isInteger(target) ? Math.min(Math.max(target, 0), LAST) : 0;
+  });
   const [sync, setSync] = useState(id ? "loading" : "idle");
   const [syncError, setSyncError] = useState("");
   const [serverFields, setServerFields] = useState({});
@@ -52,9 +57,12 @@ export default function PengajuanBaruFormPage() {
   const [submitError, setSubmitError] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [locked, setLocked] = useState(null);
+  // Legacy keeps the row at status "-1" after sending: only the gate answers freeze.
+  const [sentAt, setSentAt] = useState(null);
   const [uploadingSlot, setUploadingSlot] = useState("");
+  const [limits, setLimits] = useState({});
   // Legacy locks the subject type once the draft exists; keep that for rows opened by id.
-  const [isExisting] = useState(Boolean(id));
+  const [isExisting, setIsExisting] = useState(Boolean(id));
   const dirty = useRef(false);
   const saving = useRef(false);
   const inflight = useRef(Promise.resolve());
@@ -80,6 +88,17 @@ export default function PengajuanBaruFormPage() {
   // autosave effect from re-arming itself after each unrelated state change.
   const valuesKey = JSON.stringify(values);
 
+  // Column budgets come from the database so the inputs stop exactly where SQL Server does.
+  useEffect(() => {
+    let alive = true;
+    getFormLimits()
+      .then((next) => alive && setLimits(next))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Runs on mount only (and on a hard URL change): once a draft is created here the page
   // navigates to its own id, and re-fetching that id would clobber unsaved keystrokes.
   useEffect(() => {
@@ -90,6 +109,7 @@ export default function PengajuanBaruFormPage() {
         if (!alive) return;
         reset(fromItem(item));
         if (item.statusKode && item.statusKode !== "-1") setLocked(item.status);
+        setSentAt(item.dikirimPada ?? null);
         setSync("saved");
       })
       .catch((err) => {
@@ -121,6 +141,8 @@ export default function PengajuanBaruFormPage() {
         setSync("saved");
         if (!recordId && result?.id) {
           setRecordId(String(result.id));
+          // Legacy freezes the gate answers as soon as the row exists.
+          setIsExisting(true);
           navigate(`/app/pengajuan-baru/${result.id}`, { replace: true });
         }
         return result;
@@ -247,13 +269,15 @@ export default function PengajuanBaruFormPage() {
 
   const statusText = locked
     ? `Status: ${locked}`
-    : {
-        idle: "Belum tersimpan",
-        loading: "Memuat…",
-        saving: "Menyimpan…",
-        saved: recordId ? `Tersimpan · No. ${recordId}` : "Tersimpan",
-        error: "Gagal menyimpan",
-      }[sync];
+    : `${
+        {
+          idle: "Belum tersimpan",
+          loading: "Memuat…",
+          saving: "Menyimpan…",
+          saved: recordId ? `Tersimpan · No. ${recordId}` : "Tersimpan",
+          error: "Gagal menyimpan",
+        }[sync]
+      }${sentAt ? " · Terkirim" : ""}`;
 
   return (
     <AppShell>
@@ -300,6 +324,11 @@ export default function PengajuanBaruFormPage() {
             Pengajuan menunggu verifikasi petugas. Perubahan setelah dikirim harus melalui
             pengajuan perbaikan.
           </Alert>
+        ) : sentAt ? (
+          <Alert tone="info" title="Pengajuan sudah dikirim" className="mt-4">
+            Isian masih bisa Anda perbarui sampai petugas memverifikasi. Pilihan kelompok
+            formulir tidak dapat diubah lagi.
+          </Alert>
         ) : null}
 
         {submitError ? (
@@ -327,8 +356,10 @@ export default function PengajuanBaruFormPage() {
               step={step}
               register={(name, opts) => {
                 const field = register(name, opts);
+                const limit = limits[name] ?? limits[String(name).split(".").pop()];
                 return {
                   ...field,
+                  ...(limit ? { maxLength: limit } : {}),
                   onChange: (event) => {
                     touched.current = true;
                     return field.onChange(event);
@@ -340,6 +371,7 @@ export default function PengajuanBaruFormPage() {
               control={control}
               setValue={setValue}
               isExisting={isExisting}
+              submitted={Boolean(sentAt)}
               recordId={recordId}
               onUpload={uploadFile}
               uploadingSlot={uploadingSlot}
@@ -375,7 +407,7 @@ export default function PengajuanBaruFormPage() {
               </Link>
             ) : (
               <Button type="submit" disabled={!agreed || submitting}>
-                {submitting ? "Mengirim…" : "Kirim pengajuan"}
+                {submitting ? "Mengirim…" : sentAt ? "Kirim ulang" : "Kirim pengajuan"}
               </Button>
             )}
           </div>

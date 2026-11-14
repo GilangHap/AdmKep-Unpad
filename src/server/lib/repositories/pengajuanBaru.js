@@ -11,12 +11,17 @@ const META_KEYS = { fetik_p1: "p1", fetik_p1_tdk: "p1tdk", fetik_p1_tdk_tdk: "p1
 
 const clean = (value) => String(value ?? "").trim();
 
+// hwn_hidup_mati has no column of its own; it is the branch that produced kelompok
+// 3 (hewan hidup) or 6 (BBT hewan), so restore it from there when a draft reopens.
+const HWN_BY_KELOMPOK = { "3": "1", "6": "2" };
+
 // The WYSIWYG (Quill) keeps a small HTML subset. Every other tag and every unreviewed
 // attribute is dropped, so no event handler or javascript: URL can reach the database.
 const RICH_TAGS = new Set([
   "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li", "blockquote", "pre", "code", "a", "span", "sub", "sup", "img", "div",
+  "table", "thead", "tbody", "tr", "th", "td",
 ]);
 const SAFE_STYLE = /^(color|background-color):\s*(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\)|[a-z-]+)$|^text-align:\s*(left|center|right|justify)$/i;
 const SAFE_CLASS = /^ql-[a-z0-9-]+$/i;
@@ -40,12 +45,14 @@ const sanitizeAttrs = (raw) => {
       if (declarations.length) out.push(`style="${declarations.join("; ")}"`);
     } else if (name === "data-list" && ["bullet", "ordered", "checked"].includes(value)) {
       out.push(`data-list="${value}"`);
+    } else if ((name === "colspan" || name === "rowspan") && /^\d{1,2}$/.test(value)) {
+      out.push(`${name}="${value}"`);
     }
   }
   return out.length ? ` ${out.join(" ")}` : "";
 };
 
-const sanitizeRich = (value) => {
+export const sanitizeRich = (value) => {
   const text = clean(value);
   if (!text) return null;
   const html = text
@@ -197,6 +204,7 @@ export async function listByUser(userId, { limit = 50 } = {}) {
       jenisData: JENIS_DATA[jenis] ?? null,
       jenjang: (r.c_jenjang ?? "").trim() || null,
       kelompok: r.kelompok ?? null,
+      kelompokKode: (r.c_kelompok ?? "").toString().trim() || null,
       dana: r.c_dana ?? null,
       peruntukan: (PERUNTUKAN[peruntukan] ?? peruntukan) || null,
       status: r.status_ajuan ?? "Inputan",
@@ -262,6 +270,7 @@ export async function findByIdForUser(id, userId) {
     peruntukan: (row.peruntukan ?? "").trim() || null,
     dibuatPada: row.cdate ?? null,
     diubahPada: row.mdate ?? null,
+    dikirimPada: row.d_kirim ?? null,
     fields: {
       ...mapFields(row),
       // Meta only fills the gate answers; empty meta keys must not wipe stored columns.
@@ -271,6 +280,7 @@ export async function findByIdForUser(id, userId) {
       d_awal: isoDate(row.d_awal),
       d_akhir: isoDate(row.d_akhir),
       d_rekrutmen: isoDate(row.d_rekrutmen),
+      hwn_hidup_mati: HWN_BY_KELOMPOK[String(row.c_kelompok ?? "").trim()] ?? "",
     },
     pembimbing: pembimbing.recordset.map((r) => ({ id: r.id, n_nama: r.n_nama ?? "" })),
     penelitiAsing: asing.recordset.map((r) => ({
@@ -451,7 +461,7 @@ export async function submitForUser(id, userId, { uid } = {}) {
     .input("uid", uid ?? null)
     .query(`
       UPDATE dbo.tm_penelitian_etik
-      SET c_status_ver = '1', c_status_protokol = '1', d_kirim = GETDATE(),
+      SET c_status_protokol = '1', d_kirim = GETDATE(),
           muid = @uid, mdate = GETDATE()
       WHERE id = @id AND id_user = @userId
         AND c_status_ver = '-1'

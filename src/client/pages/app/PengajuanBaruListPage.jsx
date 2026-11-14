@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowUpRight,
   ChevronDown,
+  ChevronRight,
   FilePlus2,
   Inbox,
   MessageCircle,
+  Printer,
   Search,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { CONTACTS } from "@/lib/dashboardData";
-import { listPengajuan } from "@/lib/pengajuanBaruApi";
+import { deletePengajuan, listPengajuan } from "@/lib/pengajuanBaruApi";
+import { SECTION_META, sectionsFor } from "@/lib/pengajuanSections";
 
 const TABS = [
   { id: "all", label: "Semua" },
@@ -28,6 +35,13 @@ const SORTS = [
 ];
 
 const isDraft = (status) => /inputan|draf/i.test(status ?? "");
+// Status tetap "-1" setelah dikirim: yang membedakan draf dan terkirim adalah tanggal kirim.
+// Baris lama yang telanjur berstatus selain "-1" juga dianggap sudah dikirim.
+const isSent = (item) =>
+  Boolean(item.dikirimPada) || (item.statusKode ? item.statusKode !== "-1" : false);
+
+// Hanya baris berstatus "-1" (masih inputan) yang boleh dihapus.
+const canDelete = (item) => item.statusKode === "-1";
 
 const statusTone = (status) => {
   if (isDraft(status)) return "neutral";
@@ -61,6 +75,7 @@ function Meta({ item }) {
     item.jenisData,
     item.peruntukan,
     item.statusKode === "8" ? null : item.statusAksi,
+    isSent(item) ? "Terkirim" : null,
     `Diperbarui ${recency(item.diubahPada ?? item.dibuatPada)}`,
   ].filter(Boolean);
 
@@ -94,6 +109,118 @@ function Meta({ item }) {
         ))}
       </p>
     </>
+  );
+}
+
+// Isi panel mengikuti "Lengkapi Data Pengajuan" di portal legacy; susunannya dibuat dua kolom.
+const SECTION_HINTS = {
+  b: "Metode dan prosedur penelitian",
+  bcd: "Metode, PSP, dan kerahasiaan",
+  c: "Proses persetujuan partisipan",
+  d: "Isi penjelasan untuk partisipan",
+  li: "Naskah informasi untuk partisipan",
+  biodata: "Data peneliti dan pembimbing",
+  e: "Pernyataan ketua pelaksana",
+};
+
+function LengkapiPanel({ item, variant }) {
+  const sections = sectionsFor(item.kelompokKode);
+  const kelompok = String(item.kelompokKode ?? "");
+  const withLi = ["1", "2", "3", "4", "5"].includes(kelompok);
+  const cetak = [
+    ["etik", "Formulir etik"],
+    ["biodata", "Biodata peneliti"],
+    ...(withLi ? [["li", "Lembar informasi"]] : []),
+    ...(withLi || kelompok === "7"
+      ? [["psp", kelompok === "7" ? "PSP laporan kasus" : "PSP"]]
+      : []),
+    ["helsinki", "Deklarasi Helsinki"],
+  ];
+  return (
+    <div
+      id={`lengkapi-${variant}-${item.id}`}
+      className="rounded-xl bg-canvas p-3 sm:p-4"
+    >
+      <div className="grid gap-6 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] sm:gap-8">
+        <section>
+          <div className="flex items-baseline justify-between gap-3 px-2.5">
+            <h3 className="text-[13px] font-semibold text-ink">Lengkapi data pengajuan</h3>
+            <span className="shrink-0 text-[12px] tabular-nums text-ink-faint">
+              {sections.length} bagian
+            </span>
+          </div>
+          <ul className="mt-1.5">
+            {sections.map((slug) => (
+              <li key={slug}>
+                <Link
+                  to={`/app/pengajuan-baru/${item.id}/bagian/${slug}`}
+                  className="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors duration-150 hover:bg-surface"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-ink">
+                      {SECTION_META[slug].label}
+                    </span>
+                    <span className="block text-[12px] leading-4 text-ink-faint">
+                      {SECTION_HINTS[slug]}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    className="size-4 shrink-0 text-ink-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-brand"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <div className="px-2.5">
+            <h3 className="text-[13px] font-semibold text-ink">Dokumen</h3>
+            <p className="mt-0.5 text-[12px] leading-4 text-ink-faint">
+              Cetak di tab baru atau unggah berkas pendukung.
+            </p>
+          </div>
+          <ul className="mt-1.5">
+            {cetak.map(([jenis, label]) => (
+              <li key={jenis}>
+                <a
+                  href={`/app/pengajuan-baru/${item.id}/cetak?jenis=${jenis}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-colors duration-150 hover:bg-surface"
+                >
+                  <Printer className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 text-[13px] font-medium text-ink">{label}</span>
+                  <ArrowUpRight
+                    className="size-4 shrink-0 text-ink-faint transition-colors duration-150 group-hover:text-brand"
+                    aria-hidden="true"
+                  />
+                </a>
+              </li>
+            ))}
+            <li className="mt-1.5 border-t border-line pt-1.5">
+              <Link
+                to={`/app/pengajuan-baru/${item.id}/dokumen`}
+                className="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors duration-150 hover:bg-surface"
+              >
+                <Upload className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium text-ink">Unggah dokumen</span>
+                  <span className="block text-[12px] leading-4 text-ink-faint">
+                    Protokol, surat pengantar, bukti pembayaran
+                  </span>
+                </span>
+                <ChevronRight
+                  className="size-4 shrink-0 text-ink-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-brand"
+                  aria-hidden="true"
+                />
+              </Link>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -158,6 +285,11 @@ export default function PengajuanBaruListPage() {
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("baru");
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [openId, setOpenId] = useState(null);
 
   const load = useCallback(() => {
     setState((prev) => ({ ...prev, status: "loading", error: "" }));
@@ -170,18 +302,47 @@ export default function PengajuanBaruListPage() {
     load();
   }, [load]);
 
+  const askDelete = (item) => {
+    setDeleteError("");
+    setPendingDelete(item);
+  };
+
+  const closeDelete = () => {
+    if (deleting) return;
+    setPendingDelete(null);
+    setDeleteError("");
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deletePengajuan(pendingDelete.id);
+      setNotice(
+        `Pengajuan "${pendingDelete.judul || "Tanpa judul"}" dihapus.`,
+      );
+      setPendingDelete(null);
+      await load();
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const { status, items, error } = state;
 
   const counts = useMemo(() => {
-    const draft = items.filter((item) => isDraft(item.status)).length;
-    return { all: items.length, draft, sent: items.length - draft };
+    const sent = items.filter(isSent).length;
+    return { all: items.length, draft: items.length - sent, sent };
   }, [items]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = items.filter((item) => {
-      if (tab === "draft" && !isDraft(item.status)) return false;
-      if (tab === "sent" && isDraft(item.status)) return false;
+      if (tab === "draft" && isSent(item)) return false;
+      if (tab === "sent" && !isSent(item)) return false;
       if (!q) return true;
       return `${item.judul ?? ""} ${item.kode ?? ""}`.toLowerCase().includes(q);
     });
@@ -219,12 +380,25 @@ export default function PengajuanBaruListPage() {
         {justSubmitted ? (
           <Alert tone="success" title="Pengajuan terkirim" className="mt-4">
             <p>
-              Pengajuan masuk antrean verifikasi petugas. Anda tidak dapat mengubahnya lagi dari
-              halaman ini.
+              Pengajuan masuk antrean verifikasi petugas. Isian lain masih bisa Anda perbarui
+              sampai petugas memverifikasi.
             </p>
             <button
               type="button"
               onClick={() => setSearchParams({}, { replace: true })}
+              className="mt-1 cursor-pointer font-semibold underline underline-offset-2"
+            >
+              Tutup
+            </button>
+          </Alert>
+        ) : null}
+
+        {notice ? (
+          <Alert tone="success" title="Pengajuan dihapus" className="mt-4">
+            <p>{notice}</p>
+            <button
+              type="button"
+              onClick={() => setNotice("")}
               className="mt-1 cursor-pointer font-semibold underline underline-offset-2"
             >
               Tutup
@@ -379,72 +553,143 @@ export default function PengajuanBaruListPage() {
                     >
                       Status
                     </th>
-                    <th scope="col" className="w-20 pb-2">
+                    <th scope="col" className="w-56 pb-2">
                       <span className="sr-only">Aksi</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="border-t border-line align-middle transition-colors hover:bg-canvas"
-                    >
-                      <td className="py-4 pr-4 align-top text-[12.5px] tabular-nums text-ink-faint">
-                        {index + 1}
-                      </td>
-                      <td className="py-4 pr-4">
-                        <Link
-                          to={`/app/pengajuan-baru/${item.id}`}
-                          className="text-[14.5px] font-semibold leading-snug text-ink hover:text-brand"
-                        >
-                          {item.judul || "(Belum ada judul)"}
-                        </Link>
-                        <Meta item={item} />
-                      </td>
-                      <td className="py-4 pr-4">
-                        <StatusPill tone={statusTone(item.status)}>{item.status}</StatusPill>
-                      </td>
-                      <td className="py-4 text-right">
-                        <Link
-                          to={`/app/pengajuan-baru/${item.id}`}
-                          className="text-[13px] font-semibold text-brand hover:text-brand-deep"
-                        >
-                          Buka
-                        </Link>
-                      </td>
-                    </tr>
+                    <Fragment key={item.id}>
+                      <tr
+                        className="border-t border-line align-middle transition-colors hover:bg-canvas"
+                      >
+                        <td className="py-4 pr-4 align-top text-[12.5px] tabular-nums text-ink-faint">
+                          {index + 1}
+                        </td>
+                        <td className="py-4 pr-4">
+                          <Link
+                            to={`/app/pengajuan-baru/${item.id}`}
+                            className="text-[14.5px] font-semibold leading-snug text-ink hover:text-brand"
+                          >
+                            {item.judul || "(Belum ada judul)"}
+                          </Link>
+                          <Meta item={item} />
+                        </td>
+                        <td className="py-4 pr-4">
+                          <StatusPill tone={statusTone(item.status)}>{item.status}</StatusPill>
+                        </td>
+                        <td className="py-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              to={`/app/pengajuan-baru/${item.id}`}
+                              className="px-1.5 py-1 text-[13px] font-semibold text-brand hover:text-brand-deep"
+                            >
+                              Buka
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenId((current) => (current === item.id ? null : item.id))
+                              }
+                              aria-expanded={openId === item.id}
+                              aria-controls={`lengkapi-desktop-${item.id}`}
+                              className="flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-ink-soft transition-colors duration-150 hover:bg-canvas-deep hover:text-brand"
+                            >
+                              Lengkapi data
+                              <ChevronDown
+                                className={`size-3.5 transition-transform duration-200 ${openId === item.id ? "rotate-180" : ""}`}
+                                aria-hidden="true"
+                              />
+                            </button>
+                            {canDelete(item) ? (
+                              <button
+                                type="button"
+                                onClick={() => askDelete(item)}
+                                aria-label={`Hapus pengajuan ${item.judul || "tanpa judul"}`}
+                                title="Hapus pengajuan"
+                                className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-red"
+                              >
+                                <Trash2 className="size-4" aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {openId === item.id ? (
+                        <tr className="border-t border-line/70">
+                          <td colSpan={4} className="pb-4">
+                            <LengkapiPanel item={item} variant="desktop" />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
 
               <ul className="divide-y divide-line md:hidden">
                 {rows.map((item, index) => (
-                  <li key={item.id} className="flex items-start gap-3 py-4">
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/app/pengajuan-baru/${item.id}`}
-                        className="text-[14.5px] font-semibold leading-snug text-ink"
-                      >
-                        <span
-                          className="mr-2 text-[12.5px] font-normal tabular-nums text-ink-faint"
-                          aria-hidden="true"
+                  <li key={item.id} className="py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to={`/app/pengajuan-baru/${item.id}`}
+                          className="text-[14.5px] font-semibold leading-snug text-ink"
                         >
-                          {index + 1}
-                        </span>
-                        {item.judul || "(Belum ada judul)"}
-                      </Link>
-                      <Meta item={item} />
-                      <div className="mt-2">
-                        <StatusPill tone={statusTone(item.status)}>{item.status}</StatusPill>
+                          <span
+                            className="mr-2 text-[12.5px] font-normal tabular-nums text-ink-faint"
+                            aria-hidden="true"
+                          >
+                            {index + 1}
+                          </span>
+                          {item.judul || "(Belum ada judul)"}
+                        </Link>
+                        <Meta item={item} />
+                        <div className="mt-2 flex flex-wrap items-center gap-3">
+                          <StatusPill tone={statusTone(item.status)}>{item.status}</StatusPill>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenId((current) => (current === item.id ? null : item.id))
+                            }
+                            aria-expanded={openId === item.id}
+                            aria-controls={`lengkapi-mobile-${item.id}`}
+                            className="flex cursor-pointer items-center gap-1 text-[12.5px] font-semibold text-ink-soft"
+                          >
+                            Lengkapi data
+                            <ChevronDown
+                              className={`size-3.5 transition-transform duration-200 ${openId === item.id ? "rotate-180" : ""}`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Link
+                          to={`/app/pengajuan-baru/${item.id}`}
+                          className="px-1.5 py-2 text-[13px] font-semibold text-brand"
+                        >
+                          Buka
+                        </Link>
+                        {canDelete(item) ? (
+                          <button
+                            type="button"
+                            onClick={() => askDelete(item)}
+                            aria-label={`Hapus pengajuan ${item.judul || "tanpa judul"}`}
+                            title="Hapus pengajuan"
+                            className="grid size-8 cursor-pointer place-items-center rounded-lg text-ink-faint transition-colors duration-150 hover:bg-canvas-deep hover:text-red"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        ) : null}
                       </div>
                     </div>
-                    <Link
-                      to={`/app/pengajuan-baru/${item.id}`}
-                      className="shrink-0 py-2 text-[13px] font-semibold text-brand"
-                    >
-                      Buka
-                    </Link>
+                    {openId === item.id ? (
+                      <div className="mt-3">
+                        <LengkapiPanel item={item} variant="mobile" />
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -454,6 +699,22 @@ export default function PengajuanBaruListPage() {
 
         {status === "ready" ? <HelpPanel /> : null}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Hapus pengajuan ini?"
+        description="Data isian dan dokumen yang sudah diunggah ikut terhapus. Tindakan ini tidak dapat dibatalkan."
+        detail={
+          pendingDelete
+            ? `No. ${pendingDelete.id} · ${pendingDelete.judul || "Tanpa judul"}`
+            : ""
+        }
+        confirmLabel="Hapus pengajuan"
+        busy={deleting}
+        error={deleteError}
+        onConfirm={confirmDelete}
+        onCancel={closeDelete}
+      />
     </AppShell>
   );
 }

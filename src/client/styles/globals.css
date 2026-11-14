@@ -5,9 +5,9 @@
   Brand: the Universitas Padjadjaran crest (public/brand/unpad-logo.png).
   Palette, type and grounds are taken verbatim from the KEP portal (kep.unpad.ac.id /
   D:\GILANG\Freelance\unpad) so the two sites read as one system:
-    unpad-blue #003d7a · blue-dark #002a5c · blue-light #1e5ba8
-    unpad-gold #f8b500 · gold-dark #9a6b00 · gold-light #ffd45e
-    paper #f8fafc · ink #0f172a · muted #64748b · line #e2e8f0
+    unpad-blue #003d7a ï¿½ blue-dark #002a5c ï¿½ blue-light #1e5ba8
+    unpad-gold #f8b500 ï¿½ gold-dark #9a6b00 ï¿½ gold-light #ffd45e
+    paper #f8fafc ï¿½ ink #0f172a ï¿½ muted #64748b ï¿½ line #e2e8f0
   Display: Plus Jakarta Sans. Body: Inter.
 */
 
@@ -174,6 +174,24 @@
   min-height: 150px;
   color: var(--color-ink);
   line-height: 1.55;
+}
+/* The biodata identity sheet is borderless and keeps the ":" column narrow. */
+.rich-text .ql-editor > table:first-child {
+  table-layout: fixed;
+}
+.rich-text .ql-editor > table:first-child td,
+.rich-text .ql-editor > table:first-child th {
+  border: 0;
+  padding: 3px 4px;
+}
+.rich-text .ql-editor > table:first-child td:nth-child(1) {
+  width: 30%;
+}
+.rich-text .ql-editor > table:first-child td:nth-child(2) {
+  width: 16px;
+}
+.rich-text .ql-editor > table:first-child td:nth-child(3) {
+  width: auto;
 }
 .rich-text .ql-editor.ql-blank::before {
   color: var(--color-ink-faint);

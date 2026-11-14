@@ -30,6 +30,7 @@ function Editor({ id, value, onChange, onBlur, describedBy, invalid, readOnly })
       readOnly,
       placeholder: "Tulis di sini…",
       modules: {
+        table: true,
         toolbar: {
           container: TOOLBAR,
           handlers: {
@@ -132,4 +133,9 @@ export function RichText({ control, name, describedBy, invalid, readOnly = false
       )}
     />
   );
+}
+
+// Plain value/onChange editor for pages that keep their own state (sub-form pages).
+export function RichTextEditor({ id, value, onChange, readOnly = false }) {
+  return <Editor id={id} value={value} onChange={onChange} readOnly={readOnly} />;
 }

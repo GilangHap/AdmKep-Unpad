@@ -69,6 +69,49 @@ export async function uploadPengajuanFile(id, slot, file) {
   return data;
 }
 
+/** Character budgets of the main form columns, straight from the database. */
+export async function getFormLimits() {
+  const data = await request("/api/pengajuan-baru/limits");
+  return data.limits ?? {};
+}
+
+/** All rows a printable document needs (main protocol + sub-forms + pengesah). */
+export async function getPengajuanPrint(id) {
+  return request(`/api/pengajuan-baru/${id}/cetak`);
+}
+
+/** Upload-documents form: registration header plus the three legacy proposal slots. */
+export async function getPengajuanDokumen(id) {
+  return request(`/api/pengajuan-baru/${id}/dokumen`);
+}
+
+/** Uploads one proposal document (1, 3 or 4) and keeps its original filename for download. */
+export async function uploadPengajuanDokumen(id, urutan, file) {
+  let res;
+  try {
+    res = await fetch(
+      `/api/pengajuan-baru/${id}/dokumen/${urutan}?nama=${encodeURIComponent(file.name)}`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/octet-stream" },
+        body: file,
+      },
+    );
+  } catch {
+    throw Object.assign(new Error("Tidak dapat mengunggah file. Periksa koneksi Anda."), {
+      reason: "network",
+    });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah file.");
+  return data;
+}
+
+export async function deletePengajuanDokumen(id, urutan) {
+  return request(`/api/pengajuan-baru/${id}/dokumen/${urutan}`, { method: "DELETE" });
+}
+
 export async function deletePengajuan(id) {
   return request(`/api/pengajuan-baru/${id}`, { method: "DELETE" });
 }
@@ -77,3 +120,34 @@ export async function deletePengajuan(id) {
 export async function submitPengajuan(id) {
   return request(`/api/pengajuan-baru/${id}/submit`, { method: "POST" });
 }
+
+/** Reads one sub-form (Isian Poin B/C/D, Lembar Informasi, Biodata, Poin E). */
+export async function getPengajuanSection(id, bagian) {
+  return request(`/api/pengajuan-baru/${id}/sections/${bagian}`);
+}
+
+/** Saves one sub-form; resolves to the stored row. */
+export async function savePengajuanSection(id, bagian, values) {
+  return request(`/api/pengajuan-baru/${id}/sections/${bagian}`, { method: "PUT", body: values });
+}
+
+/** Uploads the KPPH recommendation file (PDF/DOC/DOCX) for the animal form. */
+export async function uploadKpph(id, file) {
+  let res;
+  try {
+    res = await fetch(`/api/pengajuan-baru/${id}/kpph`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/octet-stream" },
+      body: file,
+    });
+  } catch {
+    throw Object.assign(new Error("Tidak dapat mengunggah file. Periksa koneksi Anda."), {
+      reason: "network",
+    });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah file.");
+  return data;
+}
+

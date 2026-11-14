@@ -12,10 +12,23 @@ import {
   submitForUser,
   setFileForUser,
 } from "../lib/repositories/pengajuanBaru.js";
+import { getSection, saveSection, mainFormLimits } from "../lib/repositories/pengajuanSections.js";
+import {
+  DOKUMEN_URUTAN,
+  DOKUMEN_JENIS,
+  listDokumen,
+  putDokumen,
+  deleteDokumen,
+} from "../lib/repositories/pengajuanDokumen.js";
+import { getPrintData } from "../lib/repositories/pengajuanPrint.js";
+import { getPool } from "../lib/db.js";
 const router = Router();
+
+const SECTION_BAGIAN = new Set(["b", "bcd", "c", "d", "li", "biodata", "e"]);
 
 const UPLOAD_DIR = path.join(process.cwd(), process.env.UPLOAD_DIR || "var/uploads");
 const FILE_SLOTS = new Set(["file_etik_lain", "file_izin_asing", "file_mou", "file_mta"]);
+const PROPOSAL_DIR = path.join(UPLOAD_DIR, "proposal");
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 // Trust bytes, not the filename: the extension is derived from the signature.
@@ -183,6 +196,11 @@ router.get("/", async (req, res) => {
   return res.json({ items });
 });
 
+// GET /api/pengajuan-baru/limits — column budgets for the main form inputs.
+router.get("/limits", async (_req, res) => {
+  return res.json({ limits: await mainFormLimits() });
+});
+
 // GET /api/pengajuan-baru/:id — one submission (only if it belongs to the caller).
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -192,6 +210,49 @@ router.get("/:id", async (req, res) => {
   const item = await findByIdForUser(id, req.user.id);
   if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
   return res.json({ item });
+});
+
+// GET /api/pengajuan-baru/:id/cetak — everything the printable documents show.
+router.get("/:id/cetak", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "ID pengajuan tidak valid." });
+  }
+  const data = await getPrintData(req.user.id, id);
+  if (!data) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  return res.json(data);
+});
+
+// GET /api/pengajuan-baru/:id/sections/:bagian — one sub-form of the submission.
+router.get("/:id/sections/:bagian", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "ID pengajuan tidak valid." });
+  }
+  if (!SECTION_BAGIAN.has(req.params.bagian)) {
+    return res.status(404).json({ error: "Bagian formulir tidak dikenal." });
+  }
+  const data = await getSection(req.user.id, id, req.params.bagian);
+  if (!data) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  return res.json(data);
+});
+
+// PUT /api/pengajuan-baru/:id/sections/:bagian — save one sub-form.
+router.put("/:id/sections/:bagian", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "ID pengajuan tidak valid." });
+  }
+  if (!SECTION_BAGIAN.has(req.params.bagian)) {
+    return res.status(404).json({ error: "Bagian formulir tidak dikenal." });
+  }
+  try {
+    const data = await saveSection(req.user.id, id, req.params.bagian, req.body);
+    if (!data) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+    return res.json(data);
+  } catch (err) {
+    return res.status(err.status ?? 500).json({ error: err.message ?? "Gagal menyimpan isian." });
+  }
 });
 
 // POST /api/pengajuan-baru — create an unsent draft owned by the caller.
@@ -315,16 +376,176 @@ router.get("/:id/files/:slot", async (req, res) => {
   );
 });
 
-// DELETE /api/pengajuan-baru/:id — soft-delete a draft that has not been sent.
+const KPPH_EXT = (buffer) => {
+  const image = sniffImage(buffer);
+  if (image && image !== "png" && image !== "jpg") return image;
+  if (buffer?.[0] === 0x50 && buffer?.[1] === 0x4b) return "docx";
+  if (buffer?.[0] === 0xd0 && buffer?.[1] === 0xcf) return "doc";
+  return null;
+};
+
+// POST /api/pengajuan-baru/:id/kpph — KPPH recommendation file for the animal form.
+router.post(
+  "/:id/kpph",
+  express.raw({ type: () => true, limit: MAX_FILE_BYTES }),
+  async (req, res) => {
+    const id = idFrom(req);
+    if (!id) return res.status(400).json({ error: "ID pengajuan tidak valid." });
+    const draft = await findByIdForUser(id, req.user.id);
+    if (!draft) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+    if (draft.statusKode !== "-1") {
+      return res.status(409).json({ error: "Pengajuan sudah dikirim; file tidak dapat diubah." });
+    }
+    const ext = KPPH_EXT(req.body);
+    if (!ext) return res.status(400).json({ error: "File harus PDF, DOC, atau DOCX." });
+
+    const dir = path.join(UPLOAD_DIR, "dokumenpendukung");
+    await mkdir(dir, { recursive: true });
+    const filename = `${id}-kpph-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    await writeFile(path.join(dir, filename), req.body);
+
+    const pool = await getPool();
+    const before = await pool
+      .request()
+      .input("id", id)
+      .query(`SELECT TOP 1 n_file_kpph AS name FROM dbo.tm_penelitian_etik_metode_hewan WHERE id_penelitian = @id`);
+    if (!before.recordset.length) {
+      await unlink(path.join(dir, filename)).catch(() => {});
+      return res.status(409).json({ error: "Simpan isian Poin B terlebih dahulu." });
+    }
+    await pool
+      .request()
+      .input("id", id)
+      .input("name", filename)
+      .query(`UPDATE dbo.tm_penelitian_etik_metode_hewan SET n_file_kpph = @name WHERE id_penelitian = @id`);
+    const previous = String(before.recordset[0]?.name ?? "").trim();
+    if (previous && previous !== filename) {
+      await unlink(path.join(dir, path.basename(previous))).catch(() => {});
+    }
+    return res.json({ filename });
+  },
+);
+
+// GET /api/pengajuan-baru/:id/kpph — download the KPPH recommendation file.
+router.get("/:id/kpph", async (req, res) => {
+  const id = idFrom(req);
+  if (!id) return res.status(400).json({ error: "ID pengajuan tidak valid." });
+  const item = await findByIdForUser(id, req.user.id);
+  if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("id", id)
+    .query(`SELECT TOP 1 n_file_kpph AS name FROM dbo.tm_penelitian_etik_metode_hewan WHERE id_penelitian = @id`);
+  const name = String(r.recordset[0]?.name ?? "").trim();
+  if (!name) return res.status(404).json({ error: "Belum ada file." });
+  return res.sendFile(
+    path.join(UPLOAD_DIR, "dokumenpendukung", path.basename(name)),
+    (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: "File tidak ditemukan." });
+    },
+  );
+});
+
+// GET /api/pengajuan-baru/:id/dokumen — the upload-documents form (legacy PROPOSAL slots).
+router.get("/:id/dokumen", async (req, res) => {
+  const id = idFrom(req);
+  if (!id) return res.status(400).json({ error: "ID pengajuan tidak valid." });
+  const item = await findByIdForUser(id, req.user.id);
+  if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  return res.json({
+    item: { id: item.id, kode: item.kode, judul: item.fields.n_judul, peneliti: item.fields.n_peneliti_u },
+    dokumen: await listDokumen(id),
+  });
+});
+
+// POST /api/pengajuan-baru/:id/dokumen/:urutan — replace one document (PDF/JPG/PNG).
+router.post(
+  "/:id/dokumen/:urutan",
+  express.raw({ type: () => true, limit: MAX_FILE_BYTES }),
+  async (req, res) => {
+    const id = idFrom(req);
+    const urutan = Number(req.params.urutan);
+    if (!id || !DOKUMEN_URUTAN.has(urutan)) {
+      return res.status(400).json({ error: "Jenis dokumen tidak dikenal." });
+    }
+    const item = await findByIdForUser(id, req.user.id);
+    if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+
+    const ext = sniffImage(req.body);
+    if (!ext) return res.status(400).json({ error: "File harus PDF, JPG, atau PNG." });
+
+    await mkdir(PROPOSAL_DIR, { recursive: true });
+    const filename = `${id}-${urutan}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    await writeFile(path.join(PROPOSAL_DIR, filename), req.body);
+
+    const previous = (await listDokumen(id)).find((d) => d.urutan === urutan)?.file ?? "";
+    await putDokumen(id, urutan, {
+      n_judul: String(req.query.nama ?? "").trim() || `${DOKUMEN_JENIS[urutan]}.${ext}`,
+      n_file: filename,
+      ukuran: req.body.length,
+    });
+    if (previous && previous !== filename) {
+      await unlink(path.join(PROPOSAL_DIR, path.basename(previous))).catch(() => {});
+    }
+    return res.json({ urutan, file: filename });
+  },
+);
+
+// GET /api/pengajuan-baru/:id/dokumen/:urutan/file — download one stored document.
+router.get("/:id/dokumen/:urutan/file", async (req, res) => {
+  const id = idFrom(req);
+  const urutan = Number(req.params.urutan);
+  if (!id || !DOKUMEN_URUTAN.has(urutan)) {
+    return res.status(400).json({ error: "Jenis dokumen tidak dikenal." });
+  }
+  const item = await findByIdForUser(id, req.user.id);
+  if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  const doc = (await listDokumen(id)).find((d) => d.urutan === urutan);
+  if (!doc?.file) return res.status(404).json({ error: "Belum ada file." });
+  return res.download(
+    path.join(PROPOSAL_DIR, path.basename(doc.file)),
+    path.basename(doc.nama || doc.file),
+    (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: "File tidak ditemukan." });
+    },
+  );
+});
+
+// DELETE /api/pengajuan-baru/:id/dokumen/:urutan — drop one document.
+router.delete("/:id/dokumen/:urutan", async (req, res) => {
+  const id = idFrom(req);
+  const urutan = Number(req.params.urutan);
+  if (!id || !DOKUMEN_URUTAN.has(urutan)) {
+    return res.status(400).json({ error: "Jenis dokumen tidak dikenal." });
+  }
+  const item = await findByIdForUser(id, req.user.id);
+  if (!item) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+  const removed = await deleteDokumen(id, urutan);
+  if (removed) {
+    await unlink(path.join(PROPOSAL_DIR, path.basename(removed))).catch(() => {});
+  }
+  return res.status(204).end();
+});
+
+// DELETE /api/pengajuan-baru/:id — soft-delete a draft (status -1), sent or not.
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: "ID pengajuan tidak valid." });
   }
+  const draft = await findByIdForUser(id, req.user.id);
   const removed = await deleteDraft(id, req.user.id, { uid: req.user.uid });
   if (!removed) {
     return res.status(404).json({ error: "Draf tidak ditemukan atau sudah dikirim." });
   }
+  await Promise.all(
+    Array.from(FILE_SLOTS).map((slot) => {
+      const name = draft?.fields?.[slot];
+      if (!name) return null;
+      return unlink(path.join(UPLOAD_DIR, "dokumenpendukung", path.basename(name))).catch(() => {});
+    }),
+  );
   return res.status(204).end();
 });
 

@@ -11,7 +11,7 @@ import { attachUser } from "./lib/session.js";
 const app = express();
 
 app.disable("x-powered-by");
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(attachUser);
 

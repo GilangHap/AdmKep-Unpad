@@ -16,6 +16,7 @@ export function Button({
     secondary:
       "border border-control bg-surface text-ink hover:border-ink-faint hover:bg-canvas",
     ghost: "text-ink-soft hover:bg-primary-soft hover:text-ink",
+    danger: "bg-red text-white hover:bg-red/90 active:bg-red",
   };
 
   const sizes = {
